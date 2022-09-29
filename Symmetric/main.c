@@ -5,9 +5,10 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
-typedef double uint64_t;
-typedef unsigned char uint8_t;
+//typedef double uint64_t;
+//typedef unsigned char uint8_t;
 
 
 uint8_t ip_table[] = {
@@ -31,27 +32,51 @@ int main(int argv, char** argc)
 {
     uint8_t raw_text[100]; // Input string
     uint8_t plain_text[8] = {0,}; // plain text for 64bit
+    uint8_t bit_one = 0;
     uint64_t tmp_text = 0;
-    char ch;
-    //uint64_t * ptr_text = NULL;
-    printf("64bit(8 bytes) string : ");
-    gets(raw_text);
-    printf("%d\n", strlen(raw_text));
+    uint64_t permutated_text = 0;
+    uint32_t a;
 
-    /* Check string <= 64bit */
+    puts("text : ");
+    gets(raw_text);
+
+    //printf("string length : %d\n", strlen(raw_text));
+
     if(strlen(raw_text) > 8)
     {
-        printf("string excced 64 bit");
-        return 0;
+        printf("excced 64bit\n");
+        return 1;
     }
-
-    memcpy(plain_text, raw_text, 8);
-    memcpy(&tmp_text, raw_text, 8);
-    for(int i = 0; i < 7; i++)
+    else
     {
-        printf("%c ",plain_text[i]);
+        memcpy(&tmp_text, raw_text, 8);
     }
 
+    //bit_one |= bit_one << 1;
+    printf("index num : ");
+    for(int i = 0; i < 64; i++)
+    {
+        printf("%d ", i+1);
+    }
+    
+    printf("\nplain txt : ");
+    for(int i = 0; i < 64; i++)
+    {
+        bit_one = (tmp_text >> i) & 0x01;
+        printf("%d ", bit_one);
+        //if((i % 8) == 7 && i != 0) printf("\n");
+    }
+    printf("\n");
 
+    printf("shift txt : ");
+    for(int i = 0; i < 64; i++)
+    {
+        bit_one = (tmp_text >> (ip_table[i]-1)) & 0x01;
+        printf("%d ", bit_one);
+      permutated_text |= (bit_one << i);
+    }
+    
+    //printf("%#x\n", tmp_text);
+    //printf("%d\n", sizeof(plain_text));
     return 0;
 }
