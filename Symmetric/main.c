@@ -44,6 +44,11 @@ uint8_t replace_table[48] = {
         44, 49, 39, 56, 34, 53,
         46, 42, 50, 36, 29, 32 };
 
+/* Key source is rotated to left shift on each round */
+uint8_t key_rotation[16] = {
+    1, 1, 2, 2, 2, 2, 2, 2,
+    1, 2, 2, 2, 2, 2, 2, 1 };
+
 void InitPermutation(char* plain_text)
 {
     
