@@ -7,6 +7,8 @@
 #include <string.h>
 #include <stdint.h>
 
+typedef unsigned char U1;
+
 //typedef double uint64_t;
 //typedef unsigned char uint8_t;
 
@@ -56,27 +58,56 @@ void InitPermutation(char* plain_text)
 
 int main(int argv, char** argc)
 {
-    uint8_t raw_text[100]; // Input string
+    uint8_t input_text[100]; // Input string
     uint8_t plain_text[8] = {0,}; // plain text for 64bit
     uint8_t bit_one = 0;
     uint64_t tmp_text = 0;
     uint64_t permutated_text = 0;
     uint32_t a;
 
+    U1 str[100] = "abcdefgh";
+    printf("%s\n", str);
+
+    for(int i = 0; i < strlen(str); i++)
+        printf("%#x ", str[i]);
+    printf("\n");
+
+    int cnt = 0;
+    for(int i = 0; i < strlen(str); i++)
+    {
+        for(int j = 7; j >= 0; j--)
+        {
+            printf("%d", (str[i] >> j) & 0x01);
+            if(cnt == 4)
+            {
+                printf(" ");
+                cnt = 0;
+            }
+            cnt++;
+        }
+    }
+
+    
+
+    #ifdef temp
     puts("text : ");
-    gets(raw_text);
+    gets(input_text);
 
     //printf("string length : %d\n", strlen(raw_text));
 
-    if(strlen(raw_text) > 8)
+    if(strlen(input_text) > 8)
     {
         printf("excced 64bit\n");
         return 1;
     }
+    printf("input string : %s\n", input_text);
+    printf("input txt length : %d\n", strlen(input_text));
+    /*
     else
     {
         memcpy(&tmp_text, raw_text, 8);
     }
+    */
 
     //bit_one |= bit_one << 1;
     printf("index num : ");
@@ -104,5 +135,6 @@ int main(int argv, char** argc)
     
     //printf("%#x\n", tmp_text);
     //printf("%d\n", sizeof(plain_text));
+    #endif
     return 0;
 }
