@@ -58,6 +58,24 @@ void InitPermutation(char* plain_text)
 
 int main(int argv, char** argc)
 {
+    U1 plain_text[8] = "abcdefgh";
+    int cnt = 0;
+
+    for(int i = 0; i < 8; i++)
+    {
+        for(int j = 7; j >= 0; j--)
+        {
+            printf("%d", (plain_text[i] >> j) & 0x01);
+            if(cnt == 3)
+            {
+                printf(" ");
+                cnt = 0;
+            }
+            else
+                cnt++;
+        }
+    }
+    #ifdef SKIP
     uint8_t input_text[100]; // Input string
     uint8_t plain_text[8] = {0,}; // plain text for 64bit
     uint8_t bit_one = 0;
@@ -86,10 +104,9 @@ int main(int argv, char** argc)
             cnt++;
         }
     }
+    #endif
 
-    
-
-    #ifdef temp
+    #ifdef SKIP
     puts("text : ");
     gets(input_text);
 
