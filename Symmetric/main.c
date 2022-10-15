@@ -6,12 +6,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 typedef unsigned char U1;
 
 //typedef double uint64_t;
 //typedef unsigned char uint8_t;
-
 
 uint8_t ip_table[] = {
     58, 50, 42, 34, 26, 18, 10, 2,
@@ -24,6 +24,15 @@ uint8_t ip_table[] = {
     63, 55, 47, 39, 31, 23, 15, 7
 
 };
+
+uint8_t fp_table[64] = {
+    40, 8, 48, 16, 56, 24, 64, 32, 39, 7, 47,
+    15, 55, 23, 63, 31, 38, 6, 46, 14, 54, 22,
+    62, 30, 37, 5, 45, 13, 53, 21, 61, 29, 36,
+    4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11,
+    51, 19, 59, 27, 34, 2, 42, 10, 50, 18, 58,
+    26, 33, 1, 41, 9, 49, 17, 57, 25
+    };
 
 uint8_t pc_1_table[] = {
         57, 49, 41, 33, 25, 17, 9,
@@ -51,14 +60,55 @@ uint8_t key_rotation[16] = {
     1, 1, 2, 2, 2, 2, 2, 2,
     1, 2, 2, 2, 2, 2, 2, 1 };
 
-void InitPermutation(char* plain_text)
+uint8_t* InitPermutation(char* pTxt, uint8_t* ip_tbl)
 {
-    
+    //printf("ip table size : %d\n", sizeof(ipt));
+
+
+    uint8_t idx = 0;
+    uint8_t pos = 0; 
+    uint8_t bin = 0x00;
+//    int cnt = 0;
+
+    uint8_t* permed_data = (uint8_t *)malloc(8 * sizeof(uint8_t));
+    if(permed_data == NULL){
+        printf("malloc failed for permed_data\n");
+        return NULL;   
+    }
+
+    for(int i = 0; i < 64; i++){
+        idx = (ip_tbl[i] - 1) / 8;
+        pos = (ip_tbl[i] - 1) % 8;
+
+        bin = (pTxt[i] >> (7 - pos)) & 0x01;
+        printf("num :  %d : index : %d, pos : %d, binary val : %d\n", i, idx, pos, bin);
+
+        idx = i / 8;
+        pos = i % 8;
+        //printf("index : %d, position : %d, bin : %d\n", idx, pos, (pTxt[i] >> (7 - pos)) & 0x01);
+        //printf("%d", (pTxt[i] >> (7 - pos)) & 0x01);
+
+        permed_data[idx] |= (bin << (7 - pos));
+
+/*
+        if (cnt == 3)
+        {
+            printf(" ");
+            cnt = 0;
+        }
+        else
+            cnt++;
+    */
+    }
+    printf("\n");
 }
 
 int main(int argv, char** argc)
 {
-    U1 plain_text[8] = "abcdefgh";
+    uint8_t plain_text[8] = "abcdefgh";
+    uint8_t perm_text[8] = {0x00, };
+    uint8_t* permed_text = NULL;
+
     int cnt = 0;
 
     for(int i = 0; i < 8; i++)
@@ -75,6 +125,32 @@ int main(int argv, char** argc)
                 cnt++;
         }
     }
+    printf("\n");
+    cnt = 0;
+    permed_text = InitPermutation(plain_text, ip_table);
+    printf("test line\n");
+    if(permed_text == NULL){
+        printf("error");
+        return 1;
+    }
+    for(int i = 0; i < 8; i++)
+    {
+        for(int j = 7; j >= 0; j--)
+        {
+            printf("%d", (permed_text[i] >> j) & 0x01);
+            if(cnt == 3)
+            {
+                printf(" ");
+                cnt = 0;
+            }
+            else
+                cnt++;
+        }
+    }
+
+    free()
+
+
     #ifdef SKIP
     uint8_t input_text[100]; // Input string
     uint8_t plain_text[8] = {0,}; // plain text for 64bit
