@@ -8,12 +8,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef unsigned char U1;
+#include "defines.h"
 
-//typedef double uint64_t;
-//typedef unsigned char uint8_t;
-
-uint8_t ip_table[] = {
+/* Initial Permutation Table */
+U1 init_perm[] = {
     58, 50, 42, 34, 26, 18, 10, 2,
     60, 52, 44, 36, 28, 20, 12, 4,
     62, 54, 46, 38, 30, 22, 14, 6,
@@ -25,7 +23,8 @@ uint8_t ip_table[] = {
 
 };
 
-uint8_t fp_table[64] = {
+/* Final Permutation Table */
+U1 final_perm[] = {
     40, 8, 48, 16, 56, 24, 64, 32, 39, 7, 47,
     15, 55, 23, 63, 31, 38, 6, 46, 14, 54, 22,
     62, 30, 37, 5, 45, 13, 53, 21, 61, 29, 36,
@@ -34,7 +33,7 @@ uint8_t fp_table[64] = {
     26, 33, 1, 41, 9, 49, 17, 57, 25
     };
 
-uint8_t pc_1_table[] = {
+U1 pc_1_table[] = {
         57, 49, 41, 33, 25, 17, 9,
         1, 58, 50, 42, 34, 26, 18,
         10, 2, 59, 51, 43, 35, 27,
@@ -45,7 +44,7 @@ uint8_t pc_1_table[] = {
         21, 13, 5, 28, 20, 12, 4
 };
 
-uint8_t replace_table[48] = {
+U1 replace_table[48] = {
         14, 17, 11, 24, 1, 5,
         3, 28, 15, 6, 21, 10,
         23, 19, 12, 4, 26, 8, 
@@ -56,21 +55,18 @@ uint8_t replace_table[48] = {
         46, 42, 50, 36, 29, 32 };
 
 /* Key source is rotated to left shift on each round */
-uint8_t key_rotation[16] = {
+U1 key_rotation[16] = {
     1, 1, 2, 2, 2, 2, 2, 2,
     1, 2, 2, 2, 2, 2, 2, 1 };
 
-uint8_t* InitPermutation(char* pTxt, uint8_t* ip_tbl)
+/* Execute Permutation */
+U1* ExecPermutation(char* pTxt, U1* ip_tbl)
 {
-    //printf("ip table size : %d\n", sizeof(ipt));
+    U1 idx = 0;
+    U1 pos = 0; 
+    U1 bin = 0x00;
 
-
-    uint8_t idx = 0;
-    uint8_t pos = 0; 
-    uint8_t bin = 0x00;
-//    int cnt = 0;
-
-    uint8_t* permed_data = (uint8_t *)malloc(8 * sizeof(uint8_t));
+    U1* permed_data = (U1 *)malloc(8 * sizeof(U1));
     if(permed_data == NULL){
         printf("malloc failed for permed_data\n");
         return NULL;   
@@ -81,80 +77,81 @@ uint8_t* InitPermutation(char* pTxt, uint8_t* ip_tbl)
         pos = (ip_tbl[i] - 1) % 8;
 
         bin = (pTxt[i] >> (7 - pos)) & 0x01;
-        printf("num :  %d : index : %d, pos : %d, binary val : %d\n", i, idx, pos, bin);
 
         idx = i / 8;
         pos = i % 8;
-        //printf("index : %d, position : %d, bin : %d\n", idx, pos, (pTxt[i] >> (7 - pos)) & 0x01);
-        //printf("%d", (pTxt[i] >> (7 - pos)) & 0x01);
 
         permed_data[idx] |= (bin << (7 - pos));
-
-/*
-        if (cnt == 3)
-        {
-            printf(" ");
-            cnt = 0;
-        }
-        else
-            cnt++;
-    */
     }
-    printf("\n");
+    return permed_data;
+}
+
+void RoundFunc()
+{
+    /* Round Function repeat 16 times */
+
+}
+
+void PrintBinary(char* txt)
+{
+    /* txt length should be 64bit */
+    int cnt = 0;
+    for(int i = 0; i < 8; i++)
+    {
+        for(int j = 7; j >= 0; j--)
+        {
+            printf("%d", (txt[i] >> j) & 0x01);
+            if(cnt == 3)
+            {
+                printf(" ");
+                cnt = 0;
+            }
+            else
+                cnt++;
+        }
+    }
+    
 }
 
 int main(int argv, char** argc)
 {
-    uint8_t plain_text[8] = "abcdefgh";
-    uint8_t perm_text[8] = {0x00, };
-    uint8_t* permed_text = NULL;
+    U1 plain_text[8] = "abcdefgh";
+    U1 perm_text[8] = {0x00, };
+    U1* permed_text = NULL;
+   // U1* plained_text = NULL;
 
-    int cnt = 0;
-
-    for(int i = 0; i < 8; i++)
-    {
-        for(int j = 7; j >= 0; j--)
-        {
-            printf("%d", (plain_text[i] >> j) & 0x01);
-            if(cnt == 3)
-            {
-                printf(" ");
-                cnt = 0;
-            }
-            else
-                cnt++;
-        }
-    }
+    printf("plain text : ");
+    PrintBinary(plain_text);
     printf("\n");
-    cnt = 0;
-    permed_text = InitPermutation(plain_text, ip_table);
-    printf("test line\n");
+
+    permed_text = ExecPermutation(plain_text, init_perm);
     if(permed_text == NULL){
         printf("error");
         return 1;
     }
-    for(int i = 0; i < 8; i++)
-    {
-        for(int j = 7; j >= 0; j--)
-        {
-            printf("%d", (permed_text[i] >> j) & 0x01);
-            if(cnt == 3)
-            {
-                printf(" ");
-                cnt = 0;
-            }
-            else
-                cnt++;
-        }
+
+    printf("permed text : ");
+    PrintBinary(permed_text);
+
+/*
+    plained_text = ExecPermutation(permed_text, final_perm);
+    if(plained_text == NULL){
+        printf("error");
+        return 1;
     }
 
-    free()
+    printf("plain text : ");
+    PrintBinary(plained_text);
+*/
+
+    free(permed_text);
+  //  free(plained_text);
 
 
     #ifdef SKIP
-    uint8_t input_text[100]; // Input string
-    uint8_t plain_text[8] = {0,}; // plain text for 64bit
-    uint8_t bit_one = 0;
+    U1 input_text[100]; // Input string
+    U1 plain_text[8] = {0,}; // plain text for 64bit
+    U1 bit_one = 0;
     uint64_t tmp_text = 0;
     uint64_t permutated_text = 0;
     uint32_t a;
