@@ -92,8 +92,10 @@ U2 EncryptARIA(IN U1 *plain_text, OUT U1 *encrypted_text)
 		ret = 0x0f11;
 		return ret;
 	}
+	int cipher_buf_len = 0;
+	cipher_buf_len = strlen((const char*)plain_text) + EVP_CIPHER_CTX_block_size(ctx_enc);
 
-	cipher_buf = (U1 *)malloc(strlen((const char*)plain_text) + EVP_CIPHER_CTX_block_size(ctx_enc));
+	cipher_buf = (U1 *)malloc(cipher_buf_len);
 	if(cipher_buf == NULL)
 	{
 		printf("cipher buf malloc failed\n");
@@ -102,7 +104,9 @@ U2 EncryptARIA(IN U1 *plain_text, OUT U1 *encrypted_text)
 	}
 	//printf("block size : %d\n", EVP_CIPHER_CTX_block_size(ctx_enc));
 
-	nRepeatUpdate = (int)strlen((char *)plain_text) / 16;
+	//printf("plain text length : %d\n", (int)strlen((char *)plain_text));
+	nRepeatUpdate = cipher_buf_len / EVP_CIPHER_CTX_block_size(ctx_enc);
+	//printf("nRepeateUpdate : %d\n", nRepeatUpdate);
 
 	for(int i = 0; i < nRepeatUpdate; i++)
 	{
@@ -117,6 +121,8 @@ U2 EncryptARIA(IN U1 *plain_text, OUT U1 *encrypted_text)
 
 	for(int i= 0; i < strlen((const char*)cipher_buf); i++)
 		printf("%#x ", cipher_buf[i]);
+
+	EVP_CIPHER_CTX_free(ctx_enc);
 
 	//printf("written bytes : %d\n", nBytesWritten);
 	//outl += nBytesWritten;
@@ -145,9 +151,12 @@ U2 EncryptARIA(IN U1 *plain_text, OUT U1 *encrypted_text)
 	for(int i= 0; i < strlen((const char*)enc_buf); i++)
 		printf("%#x ", enc_buf[i]);
 		*/
+
+	const EVP_CIPHER *evp_cipher_dec = EVP_aria_128_ecb();
+	EVP_CIPHER_CTX *ctx_dec = EVP_CIPHER_CTX_new();
 	nBytesWritten = 0;
 
-	ret = EVP_DecryptInit_ex(ctx_enc, evp_cipher, NULL, key, NULL);
+	ret = EVP_DecryptInit_ex(ctx_dec, evp_cipher_dec, NULL, key, NULL);
 
 	if(!ret)
 	{
@@ -157,10 +166,19 @@ U2 EncryptARIA(IN U1 *plain_text, OUT U1 *encrypted_text)
 	}
 	for(int i = 0; i < nRepeatUpdate; i++)
 	{
-		EVP_DecryptUpdate(ctx_enc, &decrypted_buf[nBytesWritten], &nBytesWritten, &plain_text[nBytesWritten], (int)strlen((char *)plain_text));
+		EVP_DecryptUpdate(ctx_dec, &decrypted_buf[nBytesWritten], &nBytesWritten, &cipher_buf[nBytesWritten], cipher_buf_len);
+		printf("nBytesWritten[%d] : %d\n",i, nBytesWritten);
+
 	}
 
-	EVP_EncryptFinal_ex(ctx_enc, &cipher_buf[nBytesWritten], &nBytesWritten);
+	EVP_DecryptFinal_ex(ctx_enc, &decrypted_buf[nBytesWritten], &nBytesWritten);
+
+	printf("last nBytesWritten : %d\n", nBytesWritten);
+
+	for(int i= 0; i < 20; i++)
+		printf("%c ", (char)decrypted_buf[i]);
+
+
 
 	
 
