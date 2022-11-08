@@ -89,13 +89,13 @@ U2 ARIA_Enc_Update(IN U1 padding_flag, IN U1 *plain_text, IN U4 plain_len,  OUT 
 	EVP_EncryptUpdate(evp_ctx_enc, &cipher_buf[outl], &nBytesWritten, plain_text, plain_len);
 	outl += nBytesWritten;
 
-	EVP_EncryptFinal_ex(evp_ctx_enc, &cipher_buf[outl], &nBytesWritten);
+	EVP_EncryptFinal(evp_ctx_enc, &cipher_buf[outl], &nBytesWritten);
 	outl += nBytesWritten;
 
-	cipher = cipher_buf;
+	//cipher = cipher_buf;
+	memcpy(cipher, cipher_buf, outl);
 	*cipher_len = outl;
 
-	memcpy(cipher, cipher_buf, outl);
 
 	/*
 	for(int i = 0; i < outl; i++)
@@ -103,6 +103,7 @@ U2 ARIA_Enc_Update(IN U1 padding_flag, IN U1 *plain_text, IN U4 plain_len,  OUT 
 		*/
 
 	EVP_CIPHER_CTX_free(evp_ctx_enc);
+	free(cipher_buf);
 
 	return 0x9000;
 }
@@ -229,9 +230,5 @@ int main(void)
 	ret = ARIA_Enc_Update(PADDING_BLOCK, plain_text_short, sizeof(plain_text_short),  cipher_text, &cipher_len);
 	if(ret == SUCCESS)
 		printf("init success\n");
-
-	for(int i = 0; i < cipher_len; i++)
-		printf("%#x ", cipher_text[i]);
-	printf("\n");
 	return 0;
 }
