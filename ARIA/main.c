@@ -155,61 +155,30 @@ U2 ARIA_Dec_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv)
 	return 0x9000;
 }
 
-#if 0
-U2 ARIA_Dec_Update(IN U1 padding_flag, IN U1 *plain_text, IN U4 plain_len,  OUT U1 *cipher, OUT U4 *cipher_len)
-
-U2 EncryptARIA(IN U1 padding_flag, IN U1 *plain_text, IN U4 plain_len,  OUT U1 *cipher, OUT U4 cipher_len)
+U2 ARIA_Dec_Update(IN U1 padding_flag, IN U1 *cipher_text, IN U4 cipher_len,  OUT U1 *plain, OUT U4 *plain_len)
 {
-	U2 ret = 0x0000;
+	U2 ret = 0;
 	U4 outl = 0;
-	U4 outdl = 0;
-	U4 nBytesWritten = 0;
-	U1 enc_buf[100] = {0x00, };
-	U1 key[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-	U1 decrypted_buf[100] = {0x00, };
-
-
-
-	const EVP_CIPHER *evp_cipher_enc = EVP_get_cipherbyname(cipher_type);
-	evp_ctx_enc = EVP_CIPHER_CTX_new();
-
-
-
-
-	printf("outl : %d\n", outl);
-
-	printf("cipher text\n");
-
-	for(int i= 0; i < outl; i++)
-		printf("%#x ", cipher_buf[i]);
-	printf("\n");
-
-	EVP_CIPHER_CTX_free(evp_ctx_enc);
-
-	ret = EVP_DecryptInit_ex(evp_ctx_dec, evp_cipher_dec, NULL, key, NULL);
-
+	U4 plain_buf_len = 0;
+	int nBytesWritten = 0;
+	ret = EVP_CIPHER_CTX_set_padding(evp_ctx_dec, padding_flag);
 	if(!ret)
 	{
-		printf("EVP_DecryptInit_ex ERROR\n");
+		printf("EVP_CIPHER_CTX_set_padding ERROR\n");
 		return 0xffff;
 	}
 
-	EVP_DecryptUpdate(evp_ctx_dec, &decrypted_buf[outdl], &nBytesWritten, cipher_buf, outl);
-	outdl += nBytesWritten;
+	EVP_DecryptUpdate(evp_ctx_dec, &plain[outl], &nBytesWritten, cipher_text, cipher_len);
+	outl += nBytesWritten;
 
-	EVP_DecryptFinal_ex(evp_ctx_dec, &decrypted_buf[outdl], &nBytesWritten);
-	outdl += nBytesWritten;
+	EVP_DecryptFinal(evp_ctx_dec, &plain[outl], &nBytesWritten);
+	outl += nBytesWritten;
 
-	printf("outdl : %d\n", outdl);
 
-	
-	for(int i= 0; i < outdl; i++)
-		printf("%c ", (char)decrypted_buf[i]);
+	*plain_len = outl;
 
 	return SUCCESS;
 }
-
-#endif
 
 int main(void)
 {
@@ -223,6 +192,9 @@ int main(void)
 	U1 cipher_text[100] = {0x00, };
 	U4 cipher_len = 0;
 
+	U1 plain_text[100] = {0x00, };
+	U4 plain_len = 0;
+
 	ret = ARIA_Enc_Init(key_short, MODE_ECB, sizeof(iv), iv);
 	if(ret == SUCCESS)
 		printf("init success\n");
@@ -230,5 +202,17 @@ int main(void)
 	ret = ARIA_Enc_Update(PADDING_BLOCK, plain_text_short, sizeof(plain_text_short),  cipher_text, &cipher_len);
 	if(ret == SUCCESS)
 		printf("init success\n");
+
+	ret = ARIA_Dec_Init(key_short, MODE_ECB, sizeof(iv), iv);
+	if(ret == SUCCESS)
+		printf("init dec success\n");
+
+	ret = ARIA_Dec_Update(PADDING_BLOCK, cipher_text, cipher_len,  plain_text, &plain_len);
+	if(ret == SUCCESS)
+		printf("init dec success\n");
+
+	for(int i= 0; i < plain_len; i++)
+		printf("%#x ", plain_text[i]);
+	printf("\n");
 	return 0;
 }
