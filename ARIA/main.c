@@ -1,6 +1,6 @@
 /**************
 Author : Gunwoo Yun
-Date : 22.11.07
+Date : 22.11.08
 Crypto : ARIA
 **************/
 
@@ -9,239 +9,229 @@ Crypto : ARIA
 #include <string.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
-//#include "aria.h"
+#include "./inc/defines.h"
 
-typedef unsigned char	U1;
-typedef unsigned short	U2;
-typedef unsigned int	U4;
+EVP_CIPHER_CTX *evp_ctx_enc = NULL;
+EVP_CIPHER_CTX *evp_ctx_dec = NULL;
 
-#define SUCCESS 0x9000
-#define IN
-#define OUT
+U1 cipher_type[12];
 
-#if 0
-U2 EncryptARIAinit(const EVP_CIPHER *ec, EVP_CIPHER_CTX)
+#if 1 
+U2 ARIA_Enc_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv)
 {
-}
-#endif
-
-U2 EncryptARIA(IN U1 *plain_text, OUT U1 *encrypted_text)
-{
+	U4 key_len = 16;
+	//U1 cipher_type[12] = {0x00, };
 	U2 ret = 0x0000;
-	U1 *cipher_buf = NULL;
-	U4 outl = 0;
-	U4 nBytesWritten = 0;
-	U1 enc_buf[100] = {0x00, };
-	U1 key[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-	U4 nRepeatUpdate = 0;
-	U1 decrypted_buf[100] = {0x00, };
 
-	const EVP_CIPHER *evp_cipher = EVP_aria_128_ecb();
-	EVP_CIPHER_CTX *ctx_enc = EVP_CIPHER_CTX_new();
+	memset(cipher_type, 0, 12);
 
-	if(ctx_enc == NULL)
+	switch(block_mode)
 	{
-		printf("ctx_enc is NULL\n");
-		ret = 0x0f10;
-		return ret;
+		case MODE_ECB :
+			sprintf(cipher_type, "aria-%d-ecb", key_len*8);
+			break;
+		case MODE_CBC :
+			sprintf(cipher_type, "aria-%d-cbc", key_len*8);
+			break;
+		case MODE_CTR :
+			sprintf(cipher_type, "aria-%d-ctr", key_len*8);
+			break;
+		case MODE_GCM :
+			sprintf(cipher_type, "aria-%d-gcm", key_len*8);
+			break;
+		default :
+			break;
+	}
+	
+	const EVP_CIPHER *evp_cipher_enc = EVP_get_cipherbyname(cipher_type);
+	evp_ctx_enc = EVP_CIPHER_CTX_new();
+
+	if((evp_cipher_enc == NULL) || (evp_ctx_enc == NULL))
+	{
+		printf("evp_cipher_enc OR evp_ctx_enc is NULL\n");
+		return 0xffff;
 	}
 
-	/*
-	ret = EVP_EncryptInit_ex(ctx_enc, evp_cipher, NULL, NULL, NULL);
-
+	/* Encryption INIT */
+	ret = EVP_EncryptInit(evp_ctx_enc, evp_cipher_enc, key, iv);
 	if(!ret)
 	{
 		printf("EVP_EncryptInit_ex ERROR\n");
-		ret = 0x0f11;
-		return ret;
+		return 0xffff;
 	}
-	*/
+	return 0x9000;
+}
 
-	ret = EVP_CIPHER_CTX_set_padding(ctx_enc, 0);
+U2 ARIA_Enc_Update(IN U1 padding_flag, IN U1 *plain_text, IN U4 plain_len,  OUT U1 *cipher, OUT U4 *cipher_len)
+{
+	U2 ret = 0x0000;
+	U4 outl = 0;
+	U1 *cipher_buf = NULL;
+	U4 cipher_buf_len = 0;
+	int nBytesWritten = 0;
+
+	ret = EVP_CIPHER_CTX_set_padding(evp_ctx_enc, padding_flag);
 	if(!ret)
 	{
 		printf("EVP_CIPHER_CTX_set_padding ERROR\n");
-		ret = 0x0f12;
-		return ret;
+		return 0xffff;
 	}
-	/*
-	printf("Generate key -->\t");
 
-	U1 *key = (U1 *)malloc(EVP_CIPHER_CTX_key_length(ctx_enc));
-	if(key == NULL)
-	{
-		printf("malloc for key failed \n");
-		ret = 0x0fa0;
-		return ret;
-	}
-	ret = RAND_bytes(key,EVP_CIPHER_CTX_key_length(ctx_enc)); 
-	if(!ret)
-	{
-		printf("RAND_bytes ERROR\n");
-		ret = 0x0fc1;
-		return ret;
-	}
-	printf("okay\n");
-	*/
-
-	ret = EVP_EncryptInit_ex(ctx_enc, evp_cipher, NULL, key, NULL);
-
-	if(!ret)
-	{
-		printf("EVP_EncryptInit_ex ERROR\n");
-		ret = 0x0f11;
-		return ret;
-	}
-	int cipher_buf_len = 0;
-	cipher_buf_len = strlen((const char*)plain_text) + EVP_CIPHER_CTX_block_size(ctx_enc);
+	cipher_buf_len = plain_len + EVP_CIPHER_CTX_block_size(evp_ctx_enc);
 
 	cipher_buf = (U1 *)malloc(cipher_buf_len);
 	if(cipher_buf == NULL)
 	{
 		printf("cipher buf malloc failed\n");
-		ret = 0x0f33;
-		return ret;
-	}
-	//printf("block size : %d\n", EVP_CIPHER_CTX_block_size(ctx_enc));
-
-	//printf("plain text length : %d\n", (int)strlen((char *)plain_text));
-	nRepeatUpdate = cipher_buf_len / EVP_CIPHER_CTX_block_size(ctx_enc);
-	//printf("nRepeateUpdate : %d\n", nRepeatUpdate);
-
-	for(int i = 0; i < nRepeatUpdate; i++)
-	{
-		EVP_EncryptUpdate(ctx_enc, &cipher_buf[nBytesWritten], &nBytesWritten, &plain_text[nBytesWritten], (int)strlen((char *)plain_text));
+		return 0xffff;
 	}
 
-	EVP_EncryptFinal_ex(ctx_enc, &cipher_buf[nBytesWritten], &nBytesWritten);
-
-	//EVP_CIPHER_CTX_free(ctx_enc);
-
-	printf("cipher text is\n");
-
-	for(int i= 0; i < strlen((const char*)cipher_buf); i++)
-		printf("%#x ", cipher_buf[i]);
-
-	EVP_CIPHER_CTX_free(ctx_enc);
-
-	//printf("written bytes : %d\n", nBytesWritten);
-	//outl += nBytesWritten;
-	//printf("outl : %d\n", outl);
-
-	/*
-	for(int i= 0; i < strlen((const char*)enc_buf); i++)
-		printf("%#x ", enc_buf[i]);
-		*/
-	/*
-	EVP_EncryptUpdate(ctx_enc, &enc_buf[outl], &nBytesWritten, &plain_text[outl], (int)strlen((char *)plain_text));
-
-	printf("written bytes : %d\n", nBytesWritten);
+	EVP_EncryptUpdate(evp_ctx_enc, &cipher_buf[outl], &nBytesWritten, plain_text, plain_len);
 	outl += nBytesWritten;
+
+	EVP_EncryptFinal_ex(evp_ctx_enc, &cipher_buf[outl], &nBytesWritten);
+	outl += nBytesWritten;
+
+	cipher = cipher_buf;
+	*cipher_len = outl;
+
+	memcpy(cipher, cipher_buf, outl);
+
+	/*
+	for(int i = 0; i < outl; i++)
+		printf("%#x ", cipher_buf[i]);
+		*/
+
+	EVP_CIPHER_CTX_free(evp_ctx_enc);
+
+	return 0x9000;
+}
+#endif
+
+
+U2 ARIA_Dec_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv)
+{
+	U4 key_len = 16;
+	//U1 cipher_type[12] = {0x00, };
+	U2 ret = 0x0000;
+
+	memset(cipher_type, 0, 12);
+
+	switch(block_mode)
+	{
+		case MODE_ECB :
+			sprintf(cipher_type, "aria-%d-ecb", key_len*8);
+			break;
+		case MODE_CBC :
+			sprintf(cipher_type, "aria-%d-cbc", key_len*8);
+			break;
+		case MODE_CTR :
+			sprintf(cipher_type, "aria-%d-ctr", key_len*8);
+			break;
+		case MODE_GCM :
+			sprintf(cipher_type, "aria-%d-gcm", key_len*8);
+			break;
+		default :
+			break;
+	}
+	
+	const EVP_CIPHER *evp_cipher_dec = EVP_get_cipherbyname(cipher_type);
+	evp_ctx_dec = EVP_CIPHER_CTX_new();
+
+	if((evp_cipher_dec == NULL) || (evp_ctx_dec == NULL))
+	{
+		printf("evp_cipher_dec OR evp_ctx_dec is NULL\n");
+		return 0xffff;
+	}
+
+	/* Encryption INIT */
+	ret = EVP_DecryptInit(evp_ctx_dec, evp_cipher_dec, key, iv);
+	if(!ret)
+	{
+		printf("EVP_DecryptInit_ex ERROR\n");
+		return 0xffff;
+	}
+	return 0x9000;
+}
+
+#if 0
+U2 ARIA_Dec_Update(IN U1 padding_flag, IN U1 *plain_text, IN U4 plain_len,  OUT U1 *cipher, OUT U4 *cipher_len)
+
+U2 EncryptARIA(IN U1 padding_flag, IN U1 *plain_text, IN U4 plain_len,  OUT U1 *cipher, OUT U4 cipher_len)
+{
+	U2 ret = 0x0000;
+	U4 outl = 0;
+	U4 outdl = 0;
+	U4 nBytesWritten = 0;
+	U1 enc_buf[100] = {0x00, };
+	U1 key[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+	U1 decrypted_buf[100] = {0x00, };
+
+
+
+	const EVP_CIPHER *evp_cipher_enc = EVP_get_cipherbyname(cipher_type);
+	evp_ctx_enc = EVP_CIPHER_CTX_new();
+
+
+
+
 	printf("outl : %d\n", outl);
-	*/
 
-	/*
-	printf("key size : %d\n", (int)strlen(key));
+	printf("cipher text\n");
 
-	for(int i= 0; i < strlen((const char*)key); i++)
-		printf("%#x ", key[i]);
-		*/
+	for(int i= 0; i < outl; i++)
+		printf("%#x ", cipher_buf[i]);
+	printf("\n");
 
-	/*
-	for(int i= 0; i < strlen((const char*)enc_buf); i++)
-		printf("%#x ", enc_buf[i]);
-		*/
+	EVP_CIPHER_CTX_free(evp_ctx_enc);
 
-	const EVP_CIPHER *evp_cipher_dec = EVP_aria_128_ecb();
-	EVP_CIPHER_CTX *ctx_dec = EVP_CIPHER_CTX_new();
-	nBytesWritten = 0;
-
-	ret = EVP_DecryptInit_ex(ctx_dec, evp_cipher_dec, NULL, key, NULL);
+	ret = EVP_DecryptInit_ex(evp_ctx_dec, evp_cipher_dec, NULL, key, NULL);
 
 	if(!ret)
 	{
 		printf("EVP_DecryptInit_ex ERROR\n");
-		ret = 0x0f11;
-		return ret;
-	}
-	for(int i = 0; i < nRepeatUpdate; i++)
-	{
-		EVP_DecryptUpdate(ctx_dec, &decrypted_buf[nBytesWritten], &nBytesWritten, &cipher_buf[nBytesWritten], cipher_buf_len);
-		printf("nBytesWritten[%d] : %d\n",i, nBytesWritten);
-
+		return 0xffff;
 	}
 
-	EVP_DecryptFinal_ex(ctx_enc, &decrypted_buf[nBytesWritten], &nBytesWritten);
+	EVP_DecryptUpdate(evp_ctx_dec, &decrypted_buf[outdl], &nBytesWritten, cipher_buf, outl);
+	outdl += nBytesWritten;
 
-	printf("last nBytesWritten : %d\n", nBytesWritten);
+	EVP_DecryptFinal_ex(evp_ctx_dec, &decrypted_buf[outdl], &nBytesWritten);
+	outdl += nBytesWritten;
 
-	for(int i= 0; i < 20; i++)
-		printf("%c ", (char)decrypted_buf[i]);
-
-
+	printf("outdl : %d\n", outdl);
 
 	
+	for(int i= 0; i < outdl; i++)
+		printf("%c ", (char)decrypted_buf[i]);
 
 	return SUCCESS;
 }
 
+#endif
+
 int main(void)
 {
 	U2 ret = 0;
+	U1 key_short[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+	U1 iv[] = { 0x0f, 0x02, 0x05, 0x03, 0x08, 0x05, 0x07, 0xaa, 0xbb, 0xcc, 0xda, 0xfb, 0xcc, 0xd0, 0xe0, 0xf0 };
 
-	char plain_text[100] = {"hello, world, abcdefghijklmnop"};
-	U1 encrypted_text[16] = {0x00, };
+	U1 plain_text_short[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
+							 0x0f, 0x02, 0x05, 0x03, 0x08, 0x05, 0x07, 0xaa, 0xbb, 0xcc, 0xda, 0xfb, 0xcc, 0xd0, 0xe0, 0xf0 };
 
-	//printf("%s\n", plain_text);
+	U1 cipher_text[100] = {0x00, };
+	U4 cipher_len = 0;
 
-	ret = EncryptARIA((U1 *)plain_text, encrypted_text);
+	ret = ARIA_Enc_Init(key_short, MODE_ECB, sizeof(iv), iv);
+	if(ret == SUCCESS)
+		printf("init success\n");
 
-	//printf("ret : %#x\n", ret);
+	ret = ARIA_Enc_Update(PADDING_BLOCK, plain_text_short, sizeof(plain_text_short),  cipher_text, &cipher_len);
+	if(ret == SUCCESS)
+		printf("init success\n");
 
-
-
-
-
-#if 0 // ARIA
-	int ret = 0;
-	ARIA_KEY encKey, decKey;
-	U1 user_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-	int user_key_len = sizeof(user_key);
-
-	U1 plain_text[] = {0x11, 0x11,0x11,0x11, 0xaa, 0xaa, 0xaa, 0xaa, 0x11, 0x11, 0x11, 0x11, 0xbb, 0xbb, 0xbb, 0xbb};
-	int plain_text_len = sizeof(plain_text);
-
-	U1 encrypted_text[100] = {0x00, };
-	U1 decrypted_text[100] = {0x00, };
-
-	//U1 enc_key[16] = {0x00, };
-	printf("user key length : %d\n", user_key_len);
-	printf("plain text length : %d\n", plain_text_len);
-
-	ret = aria_set_encrypt_key(user_key, 128, &encKey);
-	if(ret < 0)
-		printf("[CODE : %d] aria_set_encrypt_key ERROR\n", ret);
-
-	ret = aria_set_decrypt_key(user_key, 128, &decKey);
-	if(ret < 0)
-		printf("[CODE : %d] aria_set_decrypt_key ERROR\n", ret);
-
-	for(int i = 0; i < strlen(plain_text); i++)
-		printf("%#x ", plain_text[i]);
+	for(int i = 0; i < cipher_len; i++)
+		printf("%#x ", cipher_text[i]);
 	printf("\n");
-
-	aria_encrypt(plain_text, encrypted_text, &encKey);
-
-	for(int i = 0; i < strlen(encrypted_text); i++)
-		printf("%#x ", encrypted_text[i]);
-	printf("\n");
-
-	aria_encrypt(encrypted_text, decrypted_text, &decKey);
-
-	for(int i = 0; i < strlen(decrypted_text); i++)
-		printf("%#x ", decrypted_text[i]);
-	printf("\n");
-#endif
-
 	return 0;
 }
