@@ -1,8 +1,8 @@
-/**************
+/*******************
 Author : Gunwoo Yun
-Date : 22.11.08
-Crypto : ARIA
-**************/
+Date : 22.11.09
+Crypto : ARIA HMAC
+*******************/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,18 +12,19 @@ Crypto : ARIA
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
 #include "./inc/defines.h"
+#include "./inc/hmacc.h"
 
 EVP_CIPHER_CTX *evp_ctx_enc = NULL;
 EVP_CIPHER_CTX *evp_ctx_dec = NULL;
 
-HMAC_CTX *hmac_ctx = NULL;
+//HMAC_CTX *hmac_ctx = NULL;
 
 U1 cipher_type[12];
 
+#if 0
 U2 HMAC_init(IN U1 *key, IN U4 key_len)
 {
 	int ret = 0;
-	printf("key len : %d\n", (int)key_len);
 
 	hmac_ctx = HMAC_CTX_new();
 	if(hmac_ctx == NULL){
@@ -57,6 +58,7 @@ U2 HMAC_final(OUT U1 *md, OUT U4 *md_len)
 
 	return 0x9000;
 }
+#endif
 
 U2 ARIA_Enc_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv)
 {
@@ -266,6 +268,7 @@ int main(void)
 	pSelectedText = plain_text_short; // Select short text
 
 	
+#if 1
 	ret = HMAC_init(key_hmac, sizeof(key_hmac));
 	if(ret != SUCCESS)
 	{
@@ -292,7 +295,6 @@ int main(void)
 		printf("%#x ", msgDgst[i]);
 	printf("\n");
 
-#if 0
 	printf("********* Plain Text ************\n");
 	for(int i= 0; i < sizeof(plain_text_short); i++)
 		printf("%#x ", plain_text_short[i]);
