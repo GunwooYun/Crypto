@@ -7,4 +7,4 @@ hmac.o : ./src/hmac.c
 aria.o : ./src/aria.c
 	gcc -c -o aria.o ./src/aria.c -I/usr/local/ssl/include -L/usr/local/ssl/lib -lcrypto -lssl
 clean:
-	rm -rf main main.o hmac.o
+	rm -rf main main.o hmac.o aria.o
