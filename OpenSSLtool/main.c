@@ -19,6 +19,13 @@ EVP_CIPHER_CTX *evp_ctx_dec = NULL;
 //U4 outl = 0;
 U1 cipher_type[12];
 
+void GenMasterKey(void)
+{
+}
+U2 GenSymKey(IN U1 symKeyIndex, IN U1 algType, IN U1 blockMode, IN U1 keyLen)
+{
+}
+
 U2 ARIA_Gcm_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv, IN U2 add_len, IN U1 *aad)
 {
     U4 key_len = 16;
