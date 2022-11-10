@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/sha.h>
+#include <openssl/aria.h>
 
 int main(int argc, char *argv[])
 {
