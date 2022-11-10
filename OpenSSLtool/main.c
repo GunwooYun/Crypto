@@ -1,6 +1,6 @@
 /*******************
 Author : Gunwoo Yun
-Date : 22.11.09
+Date : 22.11.10
 Crypto : ARIA HMAC
 *******************/
 
@@ -9,17 +9,17 @@ Crypto : ARIA HMAC
 #include <string.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
-#include <openssl/hmac.h>
 #include <openssl/sha.h>
 #include "./inc/defines.h"
 #include "./inc/hmacc.h"
+#include "./inc/aria.h"
 
+#if 0
 EVP_CIPHER_CTX *evp_ctx_enc = NULL;
 EVP_CIPHER_CTX *evp_ctx_dec = NULL;
 
 
 U1 cipher_type[12];
-
 U2 ARIA_Enc_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv)
 {
 	U4 key_len = 16;
@@ -181,7 +181,7 @@ U2 ARIA_Dec_Update(IN U1 padding_flag, IN U1 *cipher_text, IN U4 cipher_len,  OU
 
 	return SUCCESS;
 }
-
+#endif
 int main(void)
 {
 	U2 ret = 0;
@@ -251,6 +251,8 @@ int main(void)
 		return 1;
 	}
 
+
+	printf("********* Message Digest ************\n");
 	for(int i= 0; i < msgDgst_len; i++)
 		printf("%#x ", msgDgst[i]);
 	printf("\n");
