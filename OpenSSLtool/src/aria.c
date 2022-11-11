@@ -13,7 +13,6 @@ U1 cipher_type[12];
 U2 ARIA_Enc_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv)
 {
     U4 key_len = 16;
-    //U1 cipher_type[12] = {0x00, };
     U2 ret = 0x0000;
 
     memset(cipher_type, 0, 12);
