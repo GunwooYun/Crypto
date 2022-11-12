@@ -160,7 +160,7 @@ U2 ARIA_Enc_Gcm_Final(IN U1 require_tag_len, OUT U1 *tag, OUT U4 *tag_len)
 	return SUCCESS;
 }
 
-U2 ARIA_Dec_Gcm_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv, IN U2 add_len, IN U1 *aad, IN U1 *tag, IN U1 tagLen)
+U2 ARIA_Dec_Gcm_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad, IN U1 *tag, IN U1 tagLen)
 {
     U4 key_len = 16;
     //U1 cipher_type_gcm[12] = {0x00, };
@@ -197,21 +197,48 @@ U2 ARIA_Dec_Gcm_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv, IN U
     }
 
     /* Decryption INIT */
+    ret = EVP_DecryptInit_ex(evp_ctx_dec_gcm, evp_cipher_dec, NULL, NULL, NULL);
+    //ret = EVP_EncryptInit_ex(evp_ctx_dec_gcm, evp_cipher_dec, NULL, NULL, NULL);
+    if(!ret)
+    {
+        printf("EVP_EncryptInit_ex ERROR\n");
+        return 0xffff;
+    }
+#if 0 // legacy
     ret = EVP_EncryptInit(evp_ctx_dec_gcm, evp_cipher_dec, key, iv);
     if(!ret)
     {
         printf("EVP_EncryptInit_ex ERROR\n");
         return 0xffff;
     }
-	//ret = EVP_CIPHER_CTX_ctrl (evp_ctx_dec_gcm, EVP_CTRL_GCM_SET_IVLEN, (int)iv_len, NULL);
+#endif
+	ret = EVP_CIPHER_CTX_ctrl(evp_ctx_dec_gcm, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL);
+	if(!ret)
+	{
+		printf("EVP_CIPHER_CTX_ctrl ivlen ERROR\n");
+		return 0xffff;
+	}
 
-    //ret = EVP_EncryptInit_ex(evp_ctx_dec_gcm, NULL, NULL, key, iv);
+	/*
+	ret = EVP_CIPHER_CTX_ctrl (evp_ctx_dec_gcm, EVP_CTRL_GCM_SET_TAG, (int)tagLen, (unsigned char *)tag);
+	printf("tag check : %d\n", ret);
+    if(!ret)
+    {
+        printf("EVP_CIPHER_CTX_ctrl ERROR\n");
+        return 0xffff;
+    }
+	*/
 
-	//ret = EVP_CIPHER_CTX_ctrl (evp_ctx_dec_gcm, EVP_CTRL_GCM_SET_TAG, (int)tagLen, (unsigned char *)tag);
+	ret = EVP_DecryptInit_ex(evp_ctx_dec_gcm, NULL, NULL, key, iv);
+	if(!ret)
+	{
+		printf("EVP_DecryptInit  ERROR\n");
+		return 0xffff;
+	}
 
 	if(block_mode == MODE_GCM)
 	{
-		ret = EVP_EncryptUpdate(evp_ctx_dec_gcm, NULL, (int *)&outl, (const unsigned char*)aad, sizeof(aad));
+		ret = EVP_DecryptUpdate(evp_ctx_dec_gcm, NULL, (int *)&outl, (const unsigned char*)aad, aad_len);
 		if(!ret)
 		{
 			printf("EVP_EncryptUpdate aad ERROR\n");
@@ -231,9 +258,11 @@ U2 ARIA_Dec_Gcm_Update(IN U1 padding_flag, IN U1 *cipher, IN U4 cipherLen, OUT U
     int nBytesWritten = 0;
 	U4 reqTagLen = 14;
 
+	U1 decTagBuf[17] = {0, };
+
 	U4 outLen = 0;
 
-    ret = EVP_CIPHER_CTX_set_padding(evp_ctx_enc_gcm, padding_flag);
+    ret = EVP_CIPHER_CTX_set_padding(evp_ctx_dec_gcm, padding_flag);
     if(!ret)
     {
         printf("EVP_CIPHER_CTX_set_padding ERROR\n");
@@ -248,36 +277,32 @@ U2 ARIA_Dec_Gcm_Update(IN U1 padding_flag, IN U1 *cipher, IN U4 cipherLen, OUT U
         printf("cipher buf malloc failed\n");
         return 0xffff;
     }
-	//ret = EVP_CIPHER_CTX_ctrl (evp_ctx_dec_gcm, EVP_CTRL_GCM_SET_TAG, (int)tagLen, (unsigned char *)tag);
+	
 
-	ret = EVP_EncryptUpdate (evp_ctx_dec_gcm, (unsigned char *)&plainBuf[outLen], (int *)&nBytesWritten, (const unsigned char *)cipher, (int)cipherLen);
+	printf("cipherLen : %d\n", (int)cipherLen);
+	printf("strlen(cipher) : %d\n", (int)strlen(cipher));
+	ret = EVP_DecryptUpdate (evp_ctx_dec_gcm, (unsigned char *)&plainBuf[outLen], (int *)&nBytesWritten, (const unsigned char *)cipher, (int)cipherLen);
     if(!ret)
     {
-        printf("EVP_EncryptUpdate ERROR\n");
+        printf("EVP_DecryptUpdate ERROR\n");
         return 0xffff;
     }
 	outLen += nBytesWritten;
 
-	/*
 	ret = EVP_CIPHER_CTX_ctrl (evp_ctx_dec_gcm, EVP_CTRL_GCM_SET_TAG, (int)tagLen, (unsigned char *)tag);
-	printf("tag length : %d\n", tagLen);
-	printf("tag : ");
-	for(int i = 0; i < tagLen; i++)
-		printf("%#x ", tag[i]);
-	printf("\n");
-	printf("verify tag : %d\n", ret);
+	printf("tag check : %d\n", ret);
     if(!ret)
     {
         printf("EVP_CIPHER_CTX_ctrl ERROR\n");
         return 0xffff;
     }
-	*/
 
-	ret = EVP_EncryptFinal(evp_ctx_dec_gcm, (unsigned char *)&plainBuf[outLen], (int *)&nBytesWritten);
+	ret = EVP_DecryptFinal_ex(evp_ctx_dec_gcm, (unsigned char *)&plainBuf[outLen], (int *)&nBytesWritten);
 	printf("final ret : %d\n", ret);
     if(!ret)
     {
-        printf("EVP_EncryptFinal ERROR\n");
+		ERR_print_errors_fp(stderr);
+        printf("EVP_DecryptFinal ERROR\n");
         return 0xffff;
     }
 	outLen += nBytesWritten;
@@ -388,14 +413,14 @@ int main(void)
 	ret = ARIA_Enc_Gcm_Init(key_short, MODE_GCM, sizeof(iv), iv, sizeof(aad), aad);
 	if(ret != SUCCESS)
 	{
-		printf("aria gcm init failed\n");
+		printf("aria gcm enc init failed\n");
 		return 1;
 	}
 
-	ret = ARIA_Enc_Gcm_Update(PADDING_BLOCK, plain_text_short, sizeof(plain_text_short), cipher_text, &cipher_len);
+	ret = ARIA_Enc_Gcm_Update(NONE_PADDING_BLOCK, plain_text_short, sizeof(plain_text_short), cipher_text, &cipher_len);
 	if(ret != SUCCESS)
 	{
-		printf("aria gcm update failed\n");
+		printf("aria gcm enc update failed\n");
 		return 1;
 	}
 	printf("Cipher Text\n");
@@ -406,7 +431,7 @@ int main(void)
 	ret = ARIA_Enc_Gcm_Final(nReqTagLen, tag, &tag_len);
 	if(ret != SUCCESS)
 	{
-		printf("aria gcm final failed\n");
+		printf("aria gcm enc final failed\n");
 		return 1;
 	}
 	printf("Tag\n");
@@ -426,14 +451,14 @@ int main(void)
 	ret = ARIA_Dec_Gcm_Init(key_short, MODE_GCM, sizeof(iv), iv, sizeof(aad), aad, tag, tag_len);
 	if(ret != SUCCESS)
 	{
-		printf("aria gcm init failed\n");
+		printf("aria gcm dec init failed\n");
 		return 1;
 	}
 
-	ret = ARIA_Dec_Gcm_Update(PADDING_BLOCK, cipher_text, cipher_len, plain_text, &plain_len, tag, tag_len);
+	ret = ARIA_Dec_Gcm_Update(NONE_PADDING_BLOCK, cipher_text, cipher_len, plain_text, &plain_len, tag, tag_len);
 	if(ret != SUCCESS)
 	{
-		printf("aria gcm update failed\n");
+		printf("aria gcm dec update failed\n");
 		return 1;
 	}
 	printf("Plain Text\n");
@@ -444,7 +469,7 @@ int main(void)
 	ret = ARIA_Dec_Gcm_Final(tag, tag_len);
 	if(ret != SUCCESS)
 	{
-		printf("aria gcm final failed\n");
+		printf("aria gcm dec final failed\n");
 		return 1;
 	}
 				
