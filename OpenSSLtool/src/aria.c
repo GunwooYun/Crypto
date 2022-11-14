@@ -10,10 +10,11 @@ EVP_CIPHER_CTX *evp_ctx_dec = NULL;
 
 U1 cipher_type[12];
 
-U2 ARIA_Enc_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv)
+U2 ARIA_Enc_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
 {
     U4 key_len = 16;
-    U2 ret = 0x0000;
+    U2 ret = 0;
+	U4 outl = 0;
 
     memset(cipher_type, 0, 12);
 
@@ -51,16 +52,36 @@ U2 ARIA_Enc_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv)
         printf("EVP_EncryptInit_ex ERROR\n");
         return 0xffff;
     }
+
+	if(block_mode == MODE_GCM)
+    {
+        ret = EVP_EncryptUpdate(evp_ctx_enc, NULL, (int *)&outl, (const unsigned char*)aad, aad_len);
+        if(!ret)
+        {
+            printf("Encrypt Init for GCM ERROR\n");
+            return 0xffff;
+        }
+    }
     return 0x9000;
 }
 
-U2 ARIA_Enc_Update(IN U1 padding_flag, IN U1 *plain_text, IN U4 plain_len,  OUT U1 *cipher, OUT U4 *cipher_len)
+U2 ARIA_Enc_Update(IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_text, IN U4 plain_len,  OUT U1 *cipher, OUT U4 *cipher_len, IN U1 req_tag_len, OUT U1 *tag, OUT U4 *tag_len)
 {
     U2 ret = 0x0000;
     U4 outl = 0;
     U1 *cipher_buf = NULL;
     U4 cipher_buf_len = 0;
     int nBytesWritten = 0;
+	//U4 req_tag_len = 14;
+
+	/* variable for TAG */
+	U4 tag_buf_len = 0;
+	U1 tag_buf[17] = {0, };
+
+	if(req_tag_len > 16 || req_tag_len < 12){
+        printf("required tag length wrong\n");
+        return 0xffff;
+    }
 
     ret = EVP_CIPHER_CTX_set_padding(evp_ctx_enc, padding_flag);
     if(!ret)
@@ -84,27 +105,34 @@ U2 ARIA_Enc_Update(IN U1 padding_flag, IN U1 *plain_text, IN U4 plain_len,  OUT 
     EVP_EncryptFinal(evp_ctx_enc, &cipher_buf[outl], &nBytesWritten);
     outl += nBytesWritten;
 
-    //cipher = cipher_buf;
     memcpy(cipher, cipher_buf, outl);
     *cipher_len = outl;
 
+	if ( block_mode == MODE_GCM)
+	{
+		ret = EVP_CIPHER_CTX_ctrl (evp_ctx_dec, EVP_CTRL_AEAD_GET_TAG, (int)req_tag_len, (unsigned char *)tag_buf);
+		if(!ret)
+		{
+			printf("EVP_CIPHER_CTX_ctrl ERROR\n");
+			return 0xffff;
+		}
 
-    /*
-    for(int i = 0; i < outl; i++)
-        printf("%#x ", cipher_buf[i]);
-        */
+		tag_buf_len = strlen(tag_buf);
+		memcpy(tag, tag_buf, tag_buf_len);
+		*tag_len = tag_buf_len;
+	}
 
-    EVP_CIPHER_CTX_free(evp_ctx_enc);
     free(cipher_buf);
 
     return 0x9000;
 }
 
-U2 ARIA_Dec_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv)
+U2 ARIA_Dec_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
 {
     U4 key_len = 16;
     //U1 cipher_type[12] = {0x00, };
     U2 ret = 0x0000;
+	U4 outl = 0;
 
     memset(cipher_type, 0, 12);
 
@@ -142,10 +170,20 @@ U2 ARIA_Dec_Init(IN U1 *key, IN U1 block_mode, IN U2 iv_len, IN U1 *iv)
         printf("EVP_DecryptInit_ex ERROR\n");
         return 0xffff;
     }
+
+	if(block_mode == MODE_GCM)
+    {
+        ret = EVP_DecryptUpdate(evp_ctx_dec, NULL, (int *)&outl, (const unsigned char*)aad, aad_len);
+        if(!ret)
+        {
+            printf("EVP_EncryptUpdate aad ERROR\n");
+            return 0xffff;
+        }
+    }
     return 0x9000;
 }
 
-U2 ARIA_Dec_Update(IN U1 padding_flag, IN U1 *cipher_text, IN U4 cipher_len,  OUT U1 *plain, OUT U4 *plain_len)
+U2 ARIA_Dec_Update(IN U1 padding_flag, IN U1 *cipher_text, IN U4 cipher_len,  OUT U1 *plain, OUT U4 *plain_len, IN U1 *tag, IN U1 tag_len)
 {
     U2 ret = 0;
     U4 outl = 0;
@@ -161,12 +199,23 @@ U2 ARIA_Dec_Update(IN U1 padding_flag, IN U1 *cipher_text, IN U4 cipher_len,  OU
     EVP_DecryptUpdate(evp_ctx_dec, &plain[outl], &nBytesWritten, cipher_text, cipher_len);
     outl += nBytesWritten;
 
-    EVP_DecryptFinal(evp_ctx_dec, &plain[outl], &nBytesWritten);
-    outl += nBytesWritten;
+	ret = EVP_CIPHER_CTX_ctrl (evp_ctx_dec, EVP_CTRL_GCM_SET_TAG, (int)tag_len, (unsigned char *)tag);
+    if(!ret)
+    {
+        printf("dec SET TAG ERROR\n");
+        return 0xffff;
+    }
 
 
-    *plain_len = outl;
+	ret = EVP_DecryptFinal(evp_ctx_dec, &plain[outl], &nBytesWritten);
+	if(ret > 0)
+	{
+		outl += nBytesWritten;
+		*plain_len = outl;
 
-    return SUCCESS;
+		return SUCCESS;
+	}
+	else
+		return 0xFFFF;
 }
 
