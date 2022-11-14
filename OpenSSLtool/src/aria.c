@@ -3,6 +3,7 @@
 #include <openssl/evp.h>
 #include "../inc/aria.h"
 #include "../inc/defines.h"
+#include "../inc/err.h"
 
 EVP_CIPHER_CTX *evp_ctx_enc = NULL;
 EVP_CIPHER_CTX *evp_ctx_dec = NULL;
@@ -107,10 +108,11 @@ U2 ARIA_Enc_Update(IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_text, IN U
 
     memcpy(cipher, cipher_buf, outl);
     *cipher_len = outl;
+	DebugPrint();
 
 	if ( block_mode == MODE_GCM)
 	{
-		ret = EVP_CIPHER_CTX_ctrl (evp_ctx_dec, EVP_CTRL_AEAD_GET_TAG, (int)req_tag_len, (unsigned char *)tag_buf);
+		ret = EVP_CIPHER_CTX_ctrl (evp_ctx_enc, EVP_CTRL_AEAD_GET_TAG, (int)req_tag_len, (unsigned char *)tag_buf);
 		if(!ret)
 		{
 			printf("EVP_CIPHER_CTX_ctrl ERROR\n");
