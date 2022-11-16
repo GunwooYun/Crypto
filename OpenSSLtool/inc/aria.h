@@ -2,6 +2,7 @@
 #define __ARIA_H_
 
 #include "defines.h"
+#define ARIA_BLOCK_SIZE 16 // 128bit
 
 // extern EVP_CIPHER_CTX *ctx;
 // extern EVP_CIPHER_CTX *evp_ctx_dec;

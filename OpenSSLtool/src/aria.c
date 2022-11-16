@@ -99,6 +99,7 @@ U2 EncryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_te
     outl += nBytesWritten;
 
     memcpy(cipher, cipher_buf, outl);
+	//cipher = cipher_buf;
     *cipher_len = outl;
 
 	if (block_mode == MODE_GCM)
@@ -114,10 +115,7 @@ U2 EncryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_te
 		memcpy(tag, tag_buf, tag_buf_len);
 		*tag_len = tag_buf_len;
 	}
-
-    free(cipher_buf);
 	EVP_CIPHER_CTX_free(ctx);
-
 }
 
 
