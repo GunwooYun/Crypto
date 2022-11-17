@@ -39,7 +39,6 @@ U2 Sha256(IN U1 *msg, IN U4 msg_len, OUT U1 *md)
 {
 	SHA256_CTX ctx;
 
-
 	if(!SHA256_Init(&ctx))
 		HandleErrors();
 
@@ -55,19 +54,21 @@ U2 HmacSha256(IN U1 *key, IN U4 key_len, IN U1 *msg, IN U4 msg_len, OUT U1 *md, 
 {
 	int ret = 0;
 	HMAC_CTX *ctx = HMAC_CTX_new();
-	if(ctx == NULL){
+	if(!ctx){
 		printf("HMAC_CTX_new() is NULL\n");
 		return 0xffff;
 	}
 
-	ret = HMAC_Init_ex(ctx, key, (int)key_len, EVP_sha256(), NULL);
-	if(!ret){
-		printf("HMAC_Init_ex failed\n");
-		return 0xffff;
-	}
+	if(!HMAC_Init_ex(ctx, key, (int)key_len, EVP_sha256(), NULL))
+		HandleErrors();
 
-	ret = HMAC_Update(ctx, msg, (size_t)msg_len);
-	ret = HMAC_Final(ctx, md, md_len);
+	if(!HMAC_Update(ctx, msg, (size_t)msg_len))
+		HandleErrors();
+
+	if(!HMAC_Final(ctx, md, md_len))
+		HandleErrors();
+
+	HMAC_CTX_free(ctx);
 
 	return 0x9000;
 }
