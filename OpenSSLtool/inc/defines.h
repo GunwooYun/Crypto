@@ -1,7 +1,6 @@
 /**************
 Author : Gunwoo Yun
-Date : 22.11.08
-Crypto : ARIA
+Date : 22.11.17
 **************/
 
 #ifndef __DEFINES_H_
@@ -20,8 +19,14 @@ typedef unsigned int    U4;
 #define MODE_CTR 0x03
 #define MODE_GCM 0x04
 
-#define PADDING_BLOCK		0x00
-#define NONE_PADDING_BLOCK	0x01
+#define PADDING_BLOCK		0x01
+#define NONE_PADDING_BLOCK	0x00
+
+typedef enum
+{
+	ARIA = 1,
+	HMAC_SHA256
+}AlgType;
 
 
 #endif
