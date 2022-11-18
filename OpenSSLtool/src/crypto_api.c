@@ -2,22 +2,26 @@
 
 U2 GenCtrDRBG(IN U4 req_rand_len, OUT U1 *out_rand)
 {
-	RAND_DRBG *rand = NULL;
+	RAND_DRBG *drbg = NULL;
 	U1 rand_buf[1024] = {0x00, };
+	U1 seed[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
 
-	rand = RAND_DRBG_new(NID_aes_128_ctr, RAND_DRBG_FLAG_CTR_NO_DF, NULL);
-	if(rand == NULL)
+	drbg = RAND_DRBG_new(NID_aes_128_ctr, RAND_DRBG_FLAG_CTR_NO_DF, NULL);
+	if(drbg == NULL)
 	{
 		printf("Failed to DRBG new\n");
 		return 1;
 	}
 
-	if(!RAND_DRBG_bytes(rand, rand_buf, req_rand_len))
+	if(!RAND_DRBG_instantiate(drbg, seed, sizeof(seed)))
+		HandleErrors();
+
+	if(!RAND_DRBG_generate(drbg, rand_buf, req_rand_len, 0, NULL, 0))
 		HandleErrors();
 
 	memcpy(out_rand, rand_buf, req_rand_len);
 
-	RAND_DRBG_free(rand);
+	RAND_DRBG_free(drbg);
 
 	return 0x9000;
 }
@@ -71,6 +75,66 @@ U2 HmacSha256(IN U1 *key, IN U4 key_len, IN U1 *msg, IN U4 msg_len, OUT U1 *md, 
 	HMAC_CTX_free(ctx);
 
 	return 0x9000;
+}
+
+U2 GmacGetTag(IN U1 *key, IN U1 *iv, IN U4 iv_len, IN U1 *aad, IN U4 aad_len, IN U4 req_tag_len, OUT U1 *tag, OUT U4 *tag_len)
+{
+	U4 outl = 0;
+
+	/* variable for TAG */
+	U1 tag_buf[17] = {0, };
+
+	EVP_CIPHER_CTX *ctx = NULL;
+
+    if((ctx = EVP_CIPHER_CTX_new()) == NULL)
+	{
+		printf("[FAIL] EVP_CIPHER_CTX_new\n");
+		return 0x0f00;
+	}
+
+	/* Tag length should be in the range below */
+	if(req_tag_len > 16 || req_tag_len < 12){
+		printf("required tag length wrong\n");
+		return 1;
+	}
+
+	/* Set cipher type and mode */
+    if (!EVP_EncryptInit_ex(ctx, EVP_aes_128_gcm(), NULL, NULL, NULL)) {
+		HandleErrors();
+    }
+
+    /* Set IV length if length is not 96 bit */
+    if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, iv_len, NULL)) {
+		HandleErrors();
+    }
+
+    /* Initialise key and IV */
+    if (!EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv)) {
+		HandleErrors();
+    }
+	// printf("iv length : %d\n", EVP_CIPHER_CTX_iv_length(ctx));
+
+    /* Zero or more calls to specify any AAD */
+    if (!EVP_EncryptUpdate(ctx, NULL, &outl, aad, aad_len)) {
+		HandleErrors();
+    }
+
+    /* Finalise: note get no output for GMAC */
+    if (!EVP_EncryptFinal_ex(ctx, tag_buf, &outl)) {
+		HandleErrors();
+    }
+
+	memset(tag_buf, 0, sizeof(tag_buf));
+
+	/* Get tag */
+    if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, req_tag_len, tag_buf)) {
+		HandleErrors();
+    }
+
+	memcpy(tag, tag_buf, req_tag_len);
+
+	return SUCCESS;
+
 }
 
 U2 EncryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_text, IN U4 plain_len, OUT U1 *cipher, OUT U4 *cipher_len, IN U1 req_tag_len, OUT U1 *tag, OUT U4 *tag_len, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
@@ -271,6 +335,7 @@ U2 DecryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher_t
 	}
 	else
 	{
+		printf("Tag is NOT same\n");
 		HandleErrors();
 	}
 }
