@@ -1,5 +1,6 @@
 #include "../inc/crypto_api.h"
 
+
 U2 GenCtrDRBG(IN U4 req_rand_len, OUT U1 *out_rand)
 {
 	RAND_DRBG *drbg = NULL;
