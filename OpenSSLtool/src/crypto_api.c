@@ -1,5 +1,160 @@
 #include "../inc/crypto_api.h"
 
+#if 0
+U2 encrypt_RSAES_OAEP(IN U1 *rsa_key, IN U1 *plain, IN U4 plain_len, OUT U1 * cipher, OUT U4 *cipher_len)
+{
+	//int ret = 0;
+	RSA *rsa = NULL;
+	BIO *bio = BIO_new_mem_buf(rsa_key, -1);
+	if(!bio)
+	{
+		printf("Failed bio\n");
+		return 0x0f00;
+	}
+	rsa = PEM_read_bio_RSA_PUBKEY(bio, &rsa, NULL, NULL);
+	if(rsa == NULL)
+    {
+        printf( "Failed to create RSA");
+    }
+	*cipher_len = RSA_public_encrypt(plain_len, plain, cipher, rsa, RSA_PKCS1_OAEP_PADDING);
+	printf("cipher length : %d\n", (unsigned int)*cipher_len);
+	BIO_free_all(bio);
+	RSA_free(rsa);
+	if(cipher_len == 0) return 0x0f00;
+	else return 0x9000;
+
+}
+#endif
+
+U2 encrypt_RSAES_OAEP(IN RSA *rsa_key, IN U1 *plain, IN U4 plain_len, OUT U1 * cipher, OUT U4 *cipher_len)
+{
+	//int ret = 0;
+	*cipher_len = RSA_public_encrypt(plain_len, plain, cipher, rsa_key, RSA_PKCS1_OAEP_PADDING);
+	//printf("cipher length : %d\n", (unsigned int)*cipher_len);
+	if(cipher_len == 0) return 0x0f00;
+	else return 0x9000;
+
+}
+
+U2 decrypt_RSAES_OAEP(IN RSA *rsa_key, IN U1 *cipher, IN U4 cipher_len, OUT U1 *plain, OUT U4 *plain_len)
+{
+	//int ret = 0;
+	*plain_len = RSA_private_decrypt(cipher_len, cipher, plain, rsa_key, RSA_PKCS1_OAEP_PADDING);
+	if(plain_len == 0) return 0x0f00;
+	else return 0x9000;
+
+}
+
+U2 GenRsaKey(IN U4 key_len, OUT RSA **rsa_key, OUT U1 *pub_key, OUT U1 *pri_key)
+{
+	int ret = 0;
+	BIGNUM *bn = BN_new();
+	if(!bn) HandleErrors(); 
+	BN_set_word(bn, RSA_F4); // RSA_F4 : 65,537(dec)
+	RSA *rsa = RSA_new();
+	if(!rsa) HandleErrors();
+	if(!RSA_generate_key_ex(rsa, key_len, bn, NULL)) // key length : 1024 bit
+		HandleErrors();
+
+	*rsa_key = rsa;
+
+	BIO *bio_public  = BIO_new(BIO_s_mem());
+	PEM_write_bio_RSAPublicKey (bio_public, rsa);
+    BIO *bio_private = BIO_new(BIO_s_mem());
+    PEM_write_bio_RSAPrivateKey(bio_private, rsa, NULL, NULL, 0, NULL, NULL);
+
+	int pub_len = BIO_pending(bio_public);
+	int pri_len = BIO_pending(bio_private);
+
+	//printf("public length : %d, private length : %d\n", pub_len, pri_len);
+
+	//U1 *pub_key_buf = (U1 *)malloc(pub_len + 1);
+	//U1 *pri_key_buf = (U1 *)malloc(pri_len + 1);
+	U1 *pub_key_buf = (U1 *)malloc(pub_len);
+	U1 *pri_key_buf = (U1 *)malloc(pri_len);
+
+    BIO_read(bio_public, pub_key_buf, pub_len);
+	BIO_read(bio_private, pri_key_buf, pri_len);   //now we read the BIO into a buffer
+
+	//pri_key_buf[pri_len] = '\0';
+    //pub_key_buf[pub_len] = '\0';
+
+	memcpy(pub_key, pub_key_buf, pub_len);
+	memcpy(pri_key, pri_key_buf, pri_len);
+
+	//printf("\n%s\n:\n%s\n", pri_key_buf, pub_key_buf);fflush(stdout);  //now we print the keys
+
+	free(pub_key_buf);
+	free(pri_key_buf);
+
+	BIO_free_all(bio_public);
+	BIO_free_all(bio_private);
+
+	BN_free(bn);
+
+	//RSA_free(rsa);
+#if 0
+	BIGNUM *n = rsa->n;
+
+	U1 *pubKey = (U1 *)malloc(4096);
+	U1 *priKey = (U1 *)malloc(4096);
+	memset(pubKey, 0, 4096);
+	BIO pubBio = BIO_new_fp(pubKey, BIO_CLOSE);
+
+	EVP_PKEY_print_private(pubBio, pkey, 0, NULL);
+
+	printf("%s\n", pubKey);
+
+	RSA *rsa_key = NULL;
+	EVP_PKEY *pkey = NULL;
+	BIO *out = NULL;
+	BIGNUM *bne;
+
+	// For print RSA key pair
+	out = BIO_new_fp(stdout, BIO_CLOSE);
+
+	pkey = EVP_PKEY_new();
+	EVP_PKEY_set1_RSA(pkey, rsa);
+	if(pkey->type == EVP_PKEY_RSA)
+	{
+		RSA *x = pkey->pkey.rsa;
+		bne = x->n;
+	}
+
+
+	// EVP_PKEY_print_private(out, pkey, 0, NULL);
+	// EVP_PKEY_print_public(out, pkey, 0, NULL);
+
+
+	//int buf_len = BN_num_bytes(bn);
+	//printf("buf_len : %d\n", buf_len);
+
+
+	char *pem_key;
+	int keylen;
+
+	BIO *bio = BIO_new(BIO_s_mem());
+	PEM_write_bio_RSAPrivateKey(bio, rsa, NULL, NULL, 0, NULL, NULL);
+
+	keylen = BIO_pending(bio);
+	printf("keylen : %d\n", keylen);
+	pem_key = calloc(keylen+1, 1); /* Null-terminate */
+	BIO_read(bio, pem_key, keylen);
+
+	printf("%s", pem_key);
+
+	BIO_free_all(bio);
+	//printf("generate key ret : %d\n", ret);
+
+	/*
+	if(!RSA_generate_key_ex(rsa, int bits, BIGNUM *e, BN_GENCB *cb))
+		HandleErrors();
+		*/
+	free(pem_key);
+#endif 
+//	BN_free(bn);
+//	RSA_free(rsa);
+}
 
 U2 GenCtrDRBG(IN U4 req_rand_len, OUT U1 *out_rand)
 {
