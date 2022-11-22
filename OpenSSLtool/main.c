@@ -16,7 +16,7 @@ Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify
 
 #define TEXT_LENGTH 64
 
-int main(void)
+int main(int argc, char **argv)
 {
 	U2 ret = 0;
 	//U1 KEK[] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B}; 
@@ -57,6 +57,22 @@ int main(void)
 
 	U1 sign[32] = {0x00, };
 	U4 sign_len = 0;
+
+	U1 sign_R[32] = {0, };
+	U1 sign_S[32] = {0, };
+
+	EC_KEY *ec_key = NULL;
+	ret = Gen_EC_key(NID_secp256k1, &ec_key);
+
+
+	printf("******* ECDSA Signification ************\n");
+	ret = sign_ECDSA(ec_key, msg, msg_len, sign_R, sign_S);
+
+	//DebugPrintArr(sign_R, 32);
+	//DebugPrintArr(sign_S, 32);
+
+	printf("******* ECDSA Verification ************\n");
+	ret = verify_ECDSA(ec_key, msg, msg_len, sign_R, sign_S);
 
 
 #if 0

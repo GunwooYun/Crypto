@@ -1,5 +1,110 @@
 #include "../inc/crypto_api.h"
 
+U2 verify_ECDSA(EC_KEY *ec_key, IN U1 *msg, IN U4 msg_len, IN U1 *sign_R, IN U1 *sign_S)
+{
+	int ret;
+	ECDSA_SIG *sig_rs = ECDSA_SIG_new();
+
+	U1 md[32] = {0, };
+	size_t md_len = 32;
+
+	/* Hashing with SHA-256 */
+	SHA256_CTX sha_256;
+	if(!SHA256_Init(&sha_256)) HandleErrors();
+	if(!SHA256_Update(&sha_256, msg, msg_len)) HandleErrors();
+	if(!SHA256_Final(md, &sha_256)) HandleErrors();
+	
+	BIGNUM *sig_r = BN_bin2bn(sign_R, 32, NULL);
+	BIGNUM *sig_s = BN_bin2bn(sign_S, 32, NULL);
+
+	ret = ECDSA_SIG_set0(sig_rs, sig_r, sig_s);
+
+	ret = ECDSA_do_verify(md, md_len, sig_rs, ec_key);
+	ECDSA_SIG_free(sig_rs);
+
+	if (ret < 0)
+	{
+		HandleErrors();
+	}
+	else if(ret == 0)
+	{
+		printf("No Verified\n");
+		return 0x0f00;
+	}
+	else
+	{
+		printf("Verified\n");
+		return 0x9000;
+	}
+
+}
+
+U2 sign_ECDSA(EC_KEY *ec_key, IN U1 *msg, IN U4 msg_len, OUT U1 *sign_R, OUT U1 *sign_S)
+{
+	int ret;
+
+	/* For SHA-256 */
+	U1 md[32] = {0, };
+	size_t md_len = 32;
+
+	/* For ECDSA */
+	ECDSA_SIG *sig_rs = ECDSA_SIG_new();
+	U1 sig_r_buf[32], sig_s_buf[32];
+	U4 sign_buf_len = 0, sig_r_len = 0, sig_s_len = 0;
+
+	/* Hashing with SHA-256 */
+	SHA256_CTX sha_256;
+	if(!SHA256_Init(&sha_256)) HandleErrors();
+	if(!SHA256_Update(&sha_256, msg, msg_len)) HandleErrors();
+	if(!SHA256_Final(md, &sha_256)) HandleErrors();
+
+	sig_rs = ECDSA_do_sign(md, md_len, ec_key);
+
+	/* for old version */
+	//sig_r = sig_rs->r;
+	//sig_s = sig_rs->s;
+
+	/* Get BIGNUM r,s from ECDSA_SIG */
+	const BIGNUM *sig_r = ECDSA_SIG_get0_r(sig_rs);
+	const BIGNUM *sig_s = ECDSA_SIG_get0_s(sig_rs);
+
+	/* Get byte size of BIGNUM r, s */
+	sig_r_len = BN_num_bytes(sig_r);
+	sig_s_len = BN_num_bytes(sig_s);
+
+	/* Convert BIGNUM r,s to unsigned char array */
+	ret = BN_bn2bin(sig_r, sig_r_buf);
+	ret = BN_bn2bin(sig_s, sig_s_buf);
+
+	memcpy(sign_R, sig_r_buf, sig_r_len);
+	memcpy(sign_S, sig_s_buf, sig_s_len);
+
+	ECDSA_SIG_free(sig_rs);
+
+	return 0x9000;
+}
+
+U2 Gen_EC_key(IN U4 std_curve, OUT EC_KEY **ec_key)
+{
+	EC_KEY *ecKey;
+
+	ecKey = EC_KEY_new_by_curve_name(std_curve);
+	if (ecKey == NULL)
+	{
+		printf("Create EC key failure\n");
+		return 0x0f00;
+	}
+	if (!EC_KEY_generate_key(ecKey))
+	{
+		printf("Generate EC key failure\n");
+		return 0x0f00;
+	}
+
+	*ec_key = ecKey;
+
+	return 0x9000;
+}
+
 U2 verify_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len, IN U1 *sign, IN U4 sign_len)
 {
 	int ret;

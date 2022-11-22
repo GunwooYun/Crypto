@@ -18,8 +18,10 @@
 
 #define ARIA_BLOCK_SIZE 16 // 128bit
 
-extern U2 sign_ECDSA();
-extern U2 verify_ECDSA();
+extern U2 sign_ECDSA(EC_KEY *ec_key, IN U1 *msg, IN U4 msg_len, OUT U1 *sign_R, OUT U1 *sign_S);
+extern U2 verify_ECDSA(EC_KEY *ec_key, IN U1 *msg, IN U4 msg_len, IN U1 *sign_R, IN U1 *sign_S);
+extern U2 Gen_EC_key(IN U4 std_curve, OUT EC_KEY **ec_key);
+
 extern U2 sign_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len, OUT U1 *sign, OUT U4 *sign_len);
 extern U2 verify_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len,  IN U1 *sign, IN U4 sign_len);
 
