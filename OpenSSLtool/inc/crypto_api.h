@@ -2,6 +2,7 @@
 #define __CRYPTO_API_H_
 
 #include "defines.h"
+#include "err.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -13,10 +14,15 @@
 #include <openssl/rsa.h>
 #include <openssl/bn.h>
 #include <openssl/pem.h>
-#include "err.h"
+#include <openssl/ecdsa.h>
+
 #define ARIA_BLOCK_SIZE 16 // 128bit
 
-//extern U2 encrypt_RSAES_OAEP(IN U1 *pub_key, IN U1 *plain, IN U4 plain_len, OUT U1 * cipher, OUT U4 *cipher_len);
+extern U2 sign_ECDSA();
+extern U2 verify_ECDSA();
+extern U2 sign_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len, OUT U1 *sign, OUT U4 *sign_len);
+extern U2 verify_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len,  IN U1 *sign, IN U4 sign_len);
+
 extern U2 encrypt_RSAES_OAEP(IN RSA *rsa_key, IN U1 *plain, IN U4 plain_len, OUT U1 * cipher, OUT U4 *cipher_len);
 extern U2 decrypt_RSAES_OAEP(IN RSA *rsa_key, IN U1 *cipher, IN U4 cipher_len, OUT U1 *plain, OUT U4 *plain_len);
 

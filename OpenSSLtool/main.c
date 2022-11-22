@@ -1,7 +1,7 @@
 /*******************
 Author : Gunwoo Yun
-Date : 22.11.21
-Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA
+Date : 22.11.22
+Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify
 
 *******************/
 
@@ -47,18 +47,25 @@ int main(void)
 	U4 msgDgst_len = 0;
 	U1 hmacData[30] = {"hello,world"};
 
-	printf("******* RSA Encryption ************\n");
 	U1 msg[] = "Hello, world";
-	U4 msg_len = 0;
+	U4 msg_len = sizeof(msg);;
 	U1 ct[256 + 1] = {0, };
 	U1 pt[4096] = {0, };
 
 	U1 public_key[4096] = {0, };
 	U1 private_key[4096] = {0, };
 
+	U1 sign[32] = {0x00, };
+	U4 sign_len = 0;
 
+
+#if 0
 	RSA *rsa_key = NULL;
 	ret = GenRsaKey(1024, &rsa_key, public_key, private_key);
+	printf("******* RSA-PSS Signification ************\n");
+	ret = sign_RSA_PSS(rsa_key, msg, msg_len, sign, &sign_len);
+	ret = verify_RSA_PSS(rsa_key, msg, msg_len, sign, sign_len); 
+	printf("******* RSA Encryption ************\n");
 	ret = encrypt_RSAES_OAEP(rsa_key, msg, sizeof(msg), ct, &cipher_len);
 	//ret = encrypt_RSAES_OAEP(rsa_key, msg, sizeof(msg), ct, &cipher_len);
 	//printf("cipher length : %d\n", cipher_len);
@@ -75,7 +82,6 @@ int main(void)
 	//printf("%s", private_key);
 	//printf("%s", public_key);
 
-#if 0
 	printf("******* DRBG TEST ************\n");
 	ret = GenCtrDRBG(16, key);
 	DebugPrintArr(key, 16);

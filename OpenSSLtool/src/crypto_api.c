@@ -1,5 +1,91 @@
 #include "../inc/crypto_api.h"
 
+U2 verify_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len, IN U1 *sign, IN U4 sign_len)
+{
+	int ret;
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *pkey = NULL;
+
+	U1 md[32] = {0, };
+	size_t md_len = 32;
+
+	/* Hashing with SHA-256 */
+	SHA256_CTX sha_256;
+	if(!SHA256_Init(&sha_256)) HandleErrors();
+	if(!SHA256_Update(&sha_256, msg, msg_len)) HandleErrors();
+	if(!SHA256_Final(md, &sha_256)) HandleErrors();
+
+	/* Convert RSA_key to EVP_PKEY */
+	pkey = EVP_PKEY_new();
+	if(pkey == NULL) HandleErrors();
+	if(!EVP_PKEY_assign_RSA(pkey, rsa_key)) HandleErrors(); // RSA key assign to EVP_PKEY
+
+	/* Perform Verify */
+	ctx = EVP_PKEY_CTX_new(pkey, NULL /* No engine */);
+	if(ctx == NULL) HandleErrors();
+	if (EVP_PKEY_verify_init(ctx) <= 0) HandleErrors();
+	/* Set padding PSS */
+	if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PSS_PADDING) <= 0) HandleErrors();
+	/* Set Hash SHA-256 */
+	if (EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0) HandleErrors();
+
+	ret = EVP_PKEY_verify(ctx, sign, (size_t)sign_len, md, md_len);
+
+	if (ret == 1) printf("Verified\n");
+	else printf("NO Verified\n");
+
+	EVP_PKEY_free(pkey);
+	EVP_PKEY_CTX_free(ctx);
+}
+
+U2 sign_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len, OUT U1 *sign, OUT U4 *sign_len)
+{
+	int ret;
+	EVP_PKEY *pkey = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+
+	U1 md[32] = {0, }, *sign_buf;
+	size_t sign_buf_len, md_len = 32;
+
+	/* Hasing with SHA-256 */
+	SHA256_CTX sha_256;
+	if(!SHA256_Init(&sha_256)) HandleErrors();
+	if(!SHA256_Update(&sha_256, msg, msg_len)) HandleErrors();
+	if(!SHA256_Final(md, &sha_256)) HandleErrors();
+
+	/* Convert RSA_key to EVP_PKEY */
+	pkey = EVP_PKEY_new();
+	if(pkey == NULL) HandleErrors();
+	if(!EVP_PKEY_assign_RSA(pkey, rsa_key)) HandleErrors(); // RSA key assign to EVP_PKEY
+
+	ctx = EVP_PKEY_CTX_new(pkey, NULL /* No engine */);
+	if(ctx == NULL) HandleErrors();
+	if (EVP_PKEY_sign_init(ctx) <= 0) HandleErrors();
+	/* Set padding PSS */
+	if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PSS_PADDING) <= 0) HandleErrors();
+	/* Set Hash SHA-256 */
+	if (EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0) HandleErrors();
+
+	/* Determine buffer length */
+	if (EVP_PKEY_sign(ctx, NULL, &sign_buf_len, md, md_len) <= 0) HandleErrors();
+
+	sign_buf = OPENSSL_malloc(sign_buf_len);
+	if(sign_buf == NULL){
+		printf("malloc failure\n");
+		return 0x0f00;
+	}
+
+	if (EVP_PKEY_sign(ctx, sign_buf, &sign_buf_len, md, md_len) <= 0) HandleErrors();
+
+	memcpy(sign, sign_buf, sign_buf_len);
+	*sign_len = sign_buf_len;
+
+	OPENSSL_free(sign_buf);
+	EVP_PKEY_CTX_free(ctx);
+	//EVP_PKEY_free(pkey);
+	//EVP_MD_CTX_free(md_ctx);
+}
+
 #if 0
 U2 encrypt_RSAES_OAEP(IN U1 *rsa_key, IN U1 *plain, IN U4 plain_len, OUT U1 * cipher, OUT U4 *cipher_len)
 {
