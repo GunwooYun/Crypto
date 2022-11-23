@@ -1,25 +1,198 @@
 /*******************
 Author : Gunwoo Yun
-Date : 22.11.22
-Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify
+Date : 22.11.23
+Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify ECDSA_sign_verify
 
 *******************/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <openssl/evp.h>
-#include <openssl/rand.h>
-#include <openssl/sha.h>
+#include <assert.h>
 #include "./inc/defines.h"
 #include "./inc/crypto_api.h"
 
 #define TEXT_LENGTH 64
 
+U1 flag_need_init = 0;
+extern U1 KEK[32];
+
+int arrcmp(IN U1 *arr_a, IN U1 *arr_b, IN U4 len)
+{
+	U1 *p_a = arr_a;
+	U1 *p_b = arr_b;
+	for(int i = 0; i < len; i++)
+	{
+		if(*(p_a++) != *(p_b++))
+			return 1;
+	}
+	return 0;
+}
+
+void load_data()
+{
+}
+void init_data()
+{
+	FILE *fp_data = NULL;
+	U1 id_buf[32] = {0, };
+	U1 pw_buf[32] = {0, };
+	U1 re_pw_buf[32] = {0, };
+	U1 salt[32] = {0, };
+	U1 salted_pw[64] = {0, };
+	U1 hashed_pw[32] = {0, };
+	U4 writtenBytes = 0;
+	printf("Initialize Data\n");
+	printf("ID : ");
+	gets(id_buf);
+	while(1)
+	{
+	printf("PW : ");
+	gets(pw_buf);
+	printf("Re type PW : ");
+	gets(re_pw_buf);
+
+	if(!strcmp(pw_buf, re_pw_buf)) break;
+	}
+
+	/* Generate salt */
+	GenCtrDRBG(sizeof(salt), salt);
+
+	memcpy(salted_pw, salt, sizeof(salt) / 2);
+	memcpy(salted_pw + (sizeof(salt) / 2), pw_buf, sizeof(pw_buf));
+	memcpy(salted_pw + (sizeof(salt) / 2) + sizeof(pw_buf), salt + sizeof(salt) / 2, sizeof(salt) / 2);
+
+	Sha256(salted_pw, sizeof(salted_pw), hashed_pw);
+
+
+	fp_data = fopen("./.data", "wb");
+	if(fp_data == NULL)
+	{
+		printf("file open failure\n");
+		return;
+	}
+	writtenBytes = fwrite(id_buf, sizeof(U1) /* 1byte */, sizeof(id_buf), fp_data);
+	assert(writtenBytes == 32);
+	writtenBytes = fwrite(hashed_pw, sizeof(U1) /* 1byte */, sizeof(hashed_pw), fp_data);
+	assert(writtenBytes == 32);
+	writtenBytes = fwrite(salt, sizeof(U1) /* 1byte */, sizeof(salt), fp_data);
+	assert(writtenBytes == 32);
+	
+	/* sym key data set 0xff */
+	// writtenBytes = fwrite(0xff, sizeof(U1) /* 1byte */, 3 + (32 * 3), fp_data);
+
+	fclose(fp_data);
+
+}
+
+void log_in()
+{
+	U1 id[32] = {0, };
+	U1 saved_hashed_pw[32] = {0, };
+	U1 id_buf[32] = {0, };
+	U1 pw_buf[32] = {0, };
+	U1 salt[32] = {0, };
+	U1 salted_pw[64] = {0, };
+	U1 input_hashed_pw[32] = {0, };
+	U4 readBytes = 0;
+
+	FILE *fp_data = NULL;
+
+	fp_data = fopen("./.data", "rb");
+	if(fp_data == NULL)
+	{
+		init_data();
+		return;
+	}
+	else
+	{
+		readBytes = fread(id, sizeof(U1), 32, fp_data); // fetch id
+		assert(readBytes == 32);
+		readBytes = fread(saved_hashed_pw, sizeof(U1), 32, fp_data); // fetch pw
+		assert(readBytes == 32);
+		readBytes = fread(salt, sizeof(U1), 32, fp_data); // fetch salt
+		assert(readBytes == 32);
+
+
+		printf("*** Log in ***\n");
+		printf("ID : ");
+		gets(id_buf);
+		while(1)
+		{
+			printf("PW : ");
+			gets(pw_buf);
+			memset(salted_pw, 0, sizeof(salted_pw));
+			memset(input_hashed_pw, 0, sizeof(input_hashed_pw));
+			memcpy(salted_pw, salt, sizeof(salt) / 2);
+			memcpy(salted_pw + (sizeof(salt) / 2), pw_buf, sizeof(pw_buf));
+			memcpy(salted_pw + (sizeof(salt) / 2) + sizeof(pw_buf), salt + sizeof(salt) / 2, sizeof(salt) / 2);
+
+			Sha256(salted_pw, sizeof(salted_pw), input_hashed_pw);
+
+			if(!arrcmp(input_hashed_pw, saved_hashed_pw, 32))
+			{
+				break;
+			}
+			else
+			{
+				printf("password not correct!\n");
+			}
+		}
+
+		/* Iterate hash 1000 times*/
+		for(int i = 0; i < 1000; i++)
+		{
+			Sha256(input_hashed_pw, sizeof(input_hashed_pw), input_hashed_pw);
+		}
+		memset(KEK, 0, sizeof(KEK));
+		Sha256(input_hashed_pw, sizeof(input_hashed_pw), KEK);
+
+	}
+	fclose(fp_data);
+	/*
+	   printf("read data ID : %s\n", id);
+	printf("read data PW\n");
+	DebugPrintArr(pw, 32);
+	fclose(fp_data);
+	*/
+
+#if 0
+	memcpy(salt_pw, salt, salt_len); // push salt into salt_pw
+	memcpy(salt_pw + salt_len, pw, sizeof(pw)-1); // push pw into salt_pw
+	//printf("salt + pw\n");
+	//DebugPrintArr(salt_pw, sizeof(salt_pw));
+	//printf("\n");
+
+	Sha256(salt_pw, sizeof(salt_pw), hashed_salt_pw); // first hash
+
+	/* Iterate hash 1000 times*/
+	for(int i = 0; i < 1000; i++)
+	{
+		Sha256(hashed_salt_pw, sizeof(hashed_salt_pw), hashed_salt_pw);
+	}
+	Sha256(hashed_salt_pw, sizeof(hashed_salt_pw), KEK);
+
+	//DebugPrintArr(hashed_salt_pw, sizeof(hashed_salt_pw));
+	printf("\n");
+
+	//printf("<< KEK >>\n");
+	//DebugPrintArr(KEK, sizeof(KEK));
+#endif
+
+}
+
+
 int main(int argc, char **argv)
 {
 	U2 ret = 0;
-	//U1 KEK[] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B}; 
+	log_in();
+	log_in();
+	printf("KEK\n");
+	DebugPrintArr(KEK, 32);
+	ret = GenAriaAesKey(0x00, 0x10);
+	DebugPrintLine();
+	ret = GenAriaAesKey(0x01, 32);
+	printf("ret2 : %d\n", ret);
 	U1 key[1024] = {0, };
 	U1 iv[] = { 0x0f, 0x02, 0x05, 0x03, 0x08, 0x05, 0x07, 0xaa, 0xbb, 0xcc, 0xda, 0xfb, 0xcc, 0xd0, 0xe0, 0xf0 }; // 16bytes
 	U1 aad[] = { 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF };	// 16 Bytes
@@ -34,6 +207,7 @@ int main(int argc, char **argv)
 
 	U1 tag[17] = {0x00, };
 	U4 tag_len = 0;
+
 
 	/* Plain Text get random value */
 	ret = RAND_bytes(plain, TEXT_LENGTH);
@@ -65,6 +239,8 @@ int main(int argc, char **argv)
 	ret = Gen_EC_key(NID_secp256k1, &ec_key);
 
 
+
+#if 0
 	printf("******* ECDSA Signification ************\n");
 	ret = sign_ECDSA(ec_key, msg, msg_len, sign_R, sign_S);
 
@@ -75,7 +251,6 @@ int main(int argc, char **argv)
 	ret = verify_ECDSA(ec_key, msg, msg_len, sign_R, sign_S);
 
 
-#if 0
 	RSA *rsa_key = NULL;
 	ret = GenRsaKey(1024, &rsa_key, public_key, private_key);
 	printf("******* RSA-PSS Signification ************\n");

@@ -6,5 +6,6 @@
 void DebugPrintLine(void);
 void DebugPrintArr(IN U1 *arr, IN U4 arr_len);
 void HandleErrors(void);
+void PrintErrMsg(U2 err_msg);
 
 #endif

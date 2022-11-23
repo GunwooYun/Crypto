@@ -17,3 +17,7 @@ void HandleErrors(void)
     ERR_print_errors_fp(stderr);
     abort();
 }
+void PrintErrMsg(U2 err_msg)
+{
+	printf("---error---\n");
+}

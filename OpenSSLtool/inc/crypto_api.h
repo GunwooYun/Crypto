@@ -29,7 +29,7 @@ extern U2 encrypt_RSAES_OAEP(IN RSA *rsa_key, IN U1 *plain, IN U4 plain_len, OUT
 extern U2 decrypt_RSAES_OAEP(IN RSA *rsa_key, IN U1 *cipher, IN U4 cipher_len, OUT U1 *plain, OUT U4 *plain_len);
 
 extern U2 GenRsaKey(IN U4 key_len, OUT RSA **rsa_key, OUT U1 *pub_key, OUT U1 *pri_key);
-extern U2 GenKey(IN U4 key_len, OUT U1 *key);
+extern int GenAriaAesKey(IN U1 key_idx, IN U4 key_len);
 
 extern U2 GenCtrDRBG(IN U4 req_rand_len, OUT U1 *out_rand);
 

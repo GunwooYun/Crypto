@@ -1,4 +1,7 @@
 #include "../inc/crypto_api.h"
+#include <assert.h>
+
+U1 KEK[32] = {0, };
 
 U2 verify_ECDSA(EC_KEY *ec_key, IN U1 *msg, IN U4 msg_len, IN U1 *sign_R, IN U1 *sign_S)
 {
@@ -373,17 +376,69 @@ U2 GenCtrDRBG(IN U4 req_rand_len, OUT U1 *out_rand)
 	return 0x9000;
 }
 
-U2 GenKey(IN U4 req_key_len, OUT U1 *key)
+int GenAriaAesKey(IN U1 key_idx, IN U4 req_key_len)
 {
 	U2 ret = 0;
+	U1 tmp_buf[32] = {0, };
+	U1 key_buf[32] = {0, };
+	U4 readBytes = 0;
+	U4 writtenBytes = 0;
+	FILE *fp_data = NULL;
 
-	U1 key_buf[1024] = {0x00, };
+	U1 encrypted_key[32] = {0, };
+	U4 encrypted_key_len = 0;
 
+	U1 iv[] = { 0x0f, 0x02, 0x05, 0x03, 0x08, 0x05, 0x07, 0xaa, 0xbb, 0xcc, 0xda, 0xfb, 0xcc, 0xd0, 0xe0, 0xf0 }; // 16bytes
+
+	/* Available index 0:4 */
+	if (key_idx < 0 && key_idx > 4)
+	{
+		PrintErrMsg(0xfe03);
+		return 0;
+	}
+
+	/* ARIA, AES key length : 16, 24, 32 byte */
+	if ((req_key_len < 16) || ((req_key_len > 16) && (req_key_len < 24)) ||
+			((req_key_len > 24) && (req_key_len < 32)) || (req_key_len > 32))
+	{
+		PrintErrMsg(0xfe04);
+		return 0;
+	}
+
+	/* Generate key using CTR-DRBG */
 	ret = GenCtrDRBG(req_key_len, key_buf);
+
+	ret = EncryptARIA(KEK, NONE_PADDING_BLOCK, MODE_CBC, key_buf, sizeof(key_buf), encrypted_key, &encrypted_key_len, 0, NULL, NULL, sizeof(iv), iv, 0, NULL);
+
+	fp_data = fopen("./.data", "r+b");
+	if(fp_data == NULL)
+	{
+		PrintErrMsg(0xd284);
+		return 0;
+	}
+
+
+	ret = fseek(fp_data, SYM_KEY_FILE_OFFSET +(32 * key_idx), SEEK_SET);
+	readBytes = fread(tmp_buf, sizeof(U1), 32, fp_data);
+
+	if(readBytes == 0)
+	{
+		ret = fseek(fp_data, SYM_KEY_FILE_OFFSET + (32 * key_idx), SEEK_SET);
+		//writtenBytes = fwrite(key_buf, sizeof(U1), 32, fp_data);
+		writtenBytes = fwrite(encrypted_key, sizeof(U1), 32, fp_data);
+		assert(writtenBytes == 32);
+		DebugPrintLine();
+	}
+	else
+	{
+		PrintErrMsg(0x003f);
+		fclose(fp_data);
+		return 0;
+	}
+
+	fclose(fp_data);
 	
-	memcpy(key, key_buf, req_key_len);
-	
-	return 0x9000;
+	return 1;
 }
 
 U2 Sha256(IN U1 *msg, IN U4 msg_len, OUT U1 *md)
@@ -499,7 +554,7 @@ U2 EncryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_te
 	U4 tag_buf_len = 0;
 	U1 tag_buf[17] = {0, };
 
-    U4 key_len = 16;
+    U4 key_len = 32;
 
     switch(block_mode)
     {
