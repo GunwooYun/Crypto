@@ -154,18 +154,18 @@ int main(int argc, char **argv)
 	U2 ret = 0;
 	log_in();
 	//log_in();
-	//ret = GenKeyAriaAes(0x00, 0x10);
-	//ret = GenkeyAriaAes(0x01, 32);
-	//ret = GenKeyAriaAes(0x02, 24);
+	ret = GenKeyAriaAes(0x00, 0x10);
+	ret = GenKeyAriaAes(0x01, 32);
+	ret = GenKeyAriaAes(0x02, 24);
 	//printf("ret2 : %d\n", ret);
-	U1 key[1024] = {0, };
+	//U1 key[1024] = {0, };
 	U1 iv[] = { 0x0f, 0x02, 0x05, 0x03, 0x08, 0x05, 0x07, 0xaa, 0xbb, 0xcc, 0xda, 0xfb, 0xcc, 0xd0, 0xe0, 0xf0 }; // 16bytes
 	U1 aad[] = { 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF };	// 16 Bytes
 
 	U1 plain[TEXT_LENGTH] = {0x00, };
 	U4 plain_len = 0;
 
-	U1 cipher[TEXT_LENGTH + ARIA_BLOCK_SIZE] = {0x00, };
+	U1 cipher[TEXT_LENGTH] = {0x00, };
 	U4 cipher_len = 0;
 
 	U4 req_tag_len = 14;
@@ -204,18 +204,22 @@ int main(int argc, char **argv)
 	ret = Gen_EC_key(NID_secp256k1, &ec_key);
 
 
-	printf("******* ARIA Encryption Start ************\n");
 	printf("Plain Text (lenth : %d)\n", sizeof(plain));
 	DebugPrintArr(plain, sizeof(plain));
+	printf("******* ARIA Encryption Start ************\n");
 
-	ret = EncryptARIA(0x00, PADDING_BLOCK, MODE_ECB, plain, sizeof(plain), cipher, &cipher_len, req_tag_len, tag, &tag_len, sizeof(iv), iv, sizeof(aad), aad);
+	//ret = EncryptARIA(0x01, PADDING_BLOCK, MODE_ECB, plain, sizeof(plain), cipher, &cipher_len, req_tag_len, tag, &tag_len, sizeof(iv), iv, sizeof(aad), aad);
+	ret = EncryptARIA(0x01, PADDING_BLOCK, MODE_ECB, plain, sizeof(plain), cipher, &cipher_len, req_tag_len, tag, &tag_len, sizeof(iv), iv, sizeof(aad), aad);
+
+	printf("cipher (length : %d)\n", cipher_len);
+	DebugPrintArr(cipher, cipher_len);
 	
 	printf("******* ARIA Decryption Start ************\n");
 	memset(plain, 0, sizeof(plain)); // plain buffer init 0
 
-	ret =  DecryptARIA(0x00, PADDING_BLOCK, MODE_ECB, cipher, cipher_len, plain, &plain_len, tag, tag_len, sizeof(iv), iv, sizeof(aad), aad);
+	ret =  DecryptARIA(0x01, PADDING_BLOCK, MODE_ECB, cipher, cipher_len, plain, &plain_len, tag, tag_len, sizeof(iv), iv, sizeof(aad), aad);
 
-	printf("Plain Text\n");
+	printf("Plain Text (length : %d)\n", plain_len);
 	DebugPrintArr(plain, plain_len);
 
 #if 0

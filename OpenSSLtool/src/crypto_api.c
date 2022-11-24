@@ -698,8 +698,8 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 	EVP_CIPHER_CTX *ctx = NULL;
 	U1 str_block_mode[12] = {0x00, };
 
-	//U1 key[32] = {0, };
-    //U4 key_len = 0;
+	U1 key[32] = {0, };
+    U4 key_len = 0;
 
     U1 *cipher_buf = NULL;
     U4 cipher_buf_len = 0;
@@ -717,13 +717,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 		return 0;
 	}
 
-	U1 key[32] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B, 0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B};
-	//U1 key[16] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B};
-	U4 key_len = 32;
-
-//	ret = GetKeyAriaAes(key_idx, key, &key_len);
-//	printf("key (length : %d)\n", key_len);
-//	DebugPrintArr(key, key_len);
+	ret = GetKeyAriaAes(key_idx, key, &key_len);
 
     switch(block_mode)
     {
@@ -753,8 +747,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
     }
 
     /* Encryption INIT */
-    //if(!EVP_EncryptInit(ctx, evp_cipher, key, iv))
-    if(!EVP_DecryptInit(ctx, EVP_aes_256_ecb() , key, iv))
+    if(!EVP_EncryptInit(ctx, evp_cipher, key, iv))
 		HandleErrors();
 
 	if(block_mode == MODE_GCM)
@@ -780,7 +773,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 		HandleErrors();
 
 	/* Expand length of cipher buffer for padding (ECB, CBC) */
-	cipher_buf_len = plain_len + EVP_CIPHER_CTX_block_size(ctx);
+	//cipher_buf_len = plain_len + EVP_CIPHER_CTX_block_size(ctx);
 
 
     cipher_buf = (U1 *)malloc(cipher_buf_len);
@@ -792,7 +785,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 
     if(!EVP_EncryptUpdate(ctx, &cipher_buf[outl], &nBytesWritten, plain_text, plain_len))
 		HandleErrors();
-    outl += nBytesWritten;
+    outl = nBytesWritten;
 
     if(!EVP_EncryptFinal(ctx, &cipher_buf[outl], &nBytesWritten))
 		HandleErrors();
@@ -803,7 +796,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 
 	if (block_mode == MODE_GCM)
 	{
-		if(!EVP_CIPHER_CTX_ctrl (ctx, EVP_CTRL_AEAD_GET_TAG, (int)req_tag_len, (unsigned char *)tag_buf))
+		if(!EVP_CIPHER_CTX_ctrl (ctx, EVP_CTRL_AEAD_GET_TAG, req_tag_len, tag_buf))
 		HandleErrors();
 
 		tag_buf_len = strlen(tag_buf);
@@ -827,13 +820,8 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
     U4 plain_buf_len = 0;
 	U1 *plain_buf = NULL;
 
-//	U1 key[32] = {0, };
- //   U4 key_len = 0;
-
-	//U1 key[32] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B};
-	U1 key[32] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B, 0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B};
-	//U1 key[16] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B};
-	U4 key_len = 32;
+	U1 key[32] = {0, };
+    U4 key_len = 0;
 
 	/* Available index 0:4 */
 	if (key_idx < 0 && key_idx > 4)
@@ -841,12 +829,10 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
 		PrintErrMsg(0xfe03);
 		return 0;
 	}
-	printf("Cipher Text (length : %d)\n", cipher_len);
-	DebugPrintArr(cipher_text, cipher_len);
 
-	//ret = GetKeyAriaAes(key_idx, key, &key_len);
-	//printf("Decrypt key (len : %d)\n", key_len);
-	//DebugPrintArr(key, key_len);
+	ret = GetKeyAriaAes(key_idx, key, &key_len);
+	printf("enc Key len : %d\n", key_len);
+	DebugPrintArr(key, key_len);
 
     switch(block_mode)
     {
@@ -865,7 +851,6 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
         default :
             break;
     }
-	printf("%s\n", str_block_mode);
 
     const EVP_CIPHER *evp_cipher = EVP_get_cipherbyname(str_block_mode);
     if(!(ctx = EVP_CIPHER_CTX_new()))
@@ -883,8 +868,7 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
         HandleErrors();
 		*/
 	
-    //if(!EVP_DecryptInit(ctx, evp_cipher, key, iv))
-    if(!EVP_DecryptInit(ctx, EVP_aes_256_ecb() , key, iv))
+    if(!EVP_DecryptInit(ctx, evp_cipher, key, iv))
 		HandleErrors();
 
 
@@ -905,15 +889,21 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
     if(!EVP_CIPHER_CTX_set_padding(ctx, padding_flag))
 		HandleErrors();
 
+    //plain_buf_len = cipher_len;
     plain_buf_len = cipher_len + EVP_CIPHER_CTX_block_size(ctx);
+	//printf("block size : %d\n", EVP_CIPHER_CTX_block_size(ctx));
 	printf("plain buf len : %d\n", plain_buf_len);
 	plain_buf = (U1 *)malloc(plain_buf_len);
+	if(plain_buf == NULL)
+		assert(plain_buf!=NULL);
+	DebugPrintLine();
 
-	//printf("outl : %d\n", outl);
     if(!EVP_DecryptUpdate(ctx, &plain_buf[outl], &nBytesWritten, cipher_text, cipher_len))
 		HandleErrors();
     outl = nBytesWritten;
-	printf("outl1 : %d\n", outl);
+	DebugPrintLine();
+	plain_buf[outl] = 0xff;
+	printf("outl : %d\n", outl);
 
 	if(block_mode == MODE_GCM)
 	{
@@ -921,12 +911,9 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
 			HandleErrors();
 	}
 
-	DebugPrintArr(plain_buf, plain_buf_len);
-
-	printf("outl2 : %d\n", outl);
-	if(!(ret = EVP_DecryptFinal_ex(ctx, &plain_buf[outl], &nBytesWritten)))
+	if(!(ret = EVP_DecryptFinal(ctx, &plain_buf[outl], &nBytesWritten)))
 		HandleErrors();
-	printf("outl3 : %d\n", outl);
+	printf("outl1 : %d\n", outl);
 
 
 	memcpy(plain, plain_buf, outl);
