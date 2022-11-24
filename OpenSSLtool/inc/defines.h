@@ -22,7 +22,8 @@ typedef unsigned int    U4;
 #define PADDING_BLOCK		0x01
 #define NONE_PADDING_BLOCK	0x00
 
-#define SYM_KEY_FILE_OFFSET 0x60 // 96
+#define KEY_LEN_FILE_OFFSET 0x60 // 96
+#define SYM_KEY_FILE_OFFSET 0x80 // 128
 
 typedef enum
 {

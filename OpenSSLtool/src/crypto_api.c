@@ -376,7 +376,57 @@ U2 GenCtrDRBG(IN U4 req_rand_len, OUT U1 *out_rand)
 	return 0x9000;
 }
 
-int GenAriaAesKey(IN U1 key_idx, IN U4 req_key_len)
+U2 GetKeyAriaAes(IN U1 key_idx, OUT U1 *key, OUT U4 *key_len)
+{
+	FILE *fp_data = NULL;
+
+	U1 encKey_buf[32] = {0, };
+	U4 encKey_buf_len = 0;
+	U4 *pEncKey_buf_len = &encKey_buf_len;
+
+	U1 key_buf[32] = {0, };
+	U4 key_buf_len = 0;
+
+	U2 ret = 0;
+	int readBytes = 0;
+
+	fp_data = fopen("./.data", "rb");
+	if(fp_data == NULL)
+	{
+		PrintErrMsg(0xd284);
+		return 0;
+	}
+
+	/* Read key length */
+	ret = fseek(fp_data, KEY_LEN_FILE_OFFSET + key_idx, SEEK_SET);
+	readBytes = fread(pEncKey_buf_len, sizeof(U1), 1, fp_data);
+
+
+	if(readBytes != 0)
+	{
+		/* Read key */
+		ret = fseek(fp_data, SYM_KEY_FILE_OFFSET + (32 * key_idx), SEEK_SET);
+		readBytes = fread(encKey_buf, sizeof(U1), 32, fp_data);
+		//assert((readBytes == 16) || (readBytes == 24) || (readBytes == 32));
+		assert(readBytes == 32);
+	}
+	else
+	{
+		PrintErrMsg(0x003f);
+		fclose(fp_data);
+		return 0;
+	}
+	ret = DecryptKeyAriaCtr(KEK, encKey_buf, encKey_buf_len, key_buf, &key_buf_len);
+
+	memcpy(key, key_buf, 32);
+	*key_len = key_buf_len;
+
+	fclose(fp_data);
+
+	return 0x9000;
+}
+
+int GenKeyAriaAes(IN U1 key_idx, IN U4 req_key_len)
 {
 	U2 ret = 0;
 	U1 tmp_buf[32] = {0, };
@@ -385,10 +435,8 @@ int GenAriaAesKey(IN U1 key_idx, IN U4 req_key_len)
 	U4 writtenBytes = 0;
 	FILE *fp_data = NULL;
 
-	U1 encrypted_key[32] = {0, };
-	U4 encrypted_key_len = 0;
-
-	U1 iv[] = { 0x0f, 0x02, 0x05, 0x03, 0x08, 0x05, 0x07, 0xaa, 0xbb, 0xcc, 0xda, 0xfb, 0xcc, 0xd0, 0xe0, 0xf0 }; // 16bytes
+	U1 enc_key[32] = {0, };
+	U4 enc_key_len = 0;
 
 	/* Available index 0:4 */
 	if (key_idx < 0 && key_idx > 4)
@@ -398,8 +446,12 @@ int GenAriaAesKey(IN U1 key_idx, IN U4 req_key_len)
 	}
 
 	/* ARIA, AES key length : 16, 24, 32 byte */
+	/*
 	if ((req_key_len < 16) || ((req_key_len > 16) && (req_key_len < 24)) ||
 			((req_key_len > 24) && (req_key_len < 32)) || (req_key_len > 32))
+			*/
+	if((req_key_len == 16) || (req_key_len == 24) || (req_key_len == 32)){}
+	else
 	{
 		PrintErrMsg(0xfe04);
 		return 0;
@@ -408,7 +460,7 @@ int GenAriaAesKey(IN U1 key_idx, IN U4 req_key_len)
 	/* Generate key using CTR-DRBG */
 	ret = GenCtrDRBG(req_key_len, key_buf);
 
-	ret = EncryptARIA(KEK, NONE_PADDING_BLOCK, MODE_CBC, key_buf, sizeof(key_buf), encrypted_key, &encrypted_key_len, 0, NULL, NULL, sizeof(iv), iv, 0, NULL);
+	ret = EncryptKeyAriaCtr(KEK, key_buf, req_key_len, enc_key, &enc_key_len);
 
 	fp_data = fopen("./.data", "r+b");
 	if(fp_data == NULL)
@@ -417,17 +469,21 @@ int GenAriaAesKey(IN U1 key_idx, IN U4 req_key_len)
 		return 0;
 	}
 
+	U4 *pEnc_key_len;
+	pEnc_key_len = &enc_key_len;
 
 	ret = fseek(fp_data, SYM_KEY_FILE_OFFSET +(32 * key_idx), SEEK_SET);
 	readBytes = fread(tmp_buf, sizeof(U1), 32, fp_data);
 
 	if(readBytes == 0)
 	{
+		/* Save key length */
+		ret = fseek(fp_data, KEY_LEN_FILE_OFFSET + key_idx, SEEK_SET);
+		writtenBytes = fwrite(pEnc_key_len, sizeof(U1), 1, fp_data);
+		/* Save encrypted key */
 		ret = fseek(fp_data, SYM_KEY_FILE_OFFSET + (32 * key_idx), SEEK_SET);
-		//writtenBytes = fwrite(key_buf, sizeof(U1), 32, fp_data);
-		writtenBytes = fwrite(encrypted_key, sizeof(U1), 32, fp_data);
+		writtenBytes = fwrite(enc_key, sizeof(U1), 32, fp_data);
 		assert(writtenBytes == 32);
-		DebugPrintLine();
 	}
 	else
 	{
@@ -456,6 +512,7 @@ U2 Sha256(IN U1 *msg, IN U4 msg_len, OUT U1 *md)
 
 	return 0x9000;
 }
+
 U2 HmacSha256(IN U1 *key, IN U4 key_len, IN U1 *msg, IN U4 msg_len, OUT U1 *md, OUT U4 *md_len)
 {
 	int ret = 0;
@@ -539,12 +596,110 @@ U2 GmacGetTag(IN U1 *key, IN U1 *iv, IN U4 iv_len, IN U1 *aad, IN U4 aad_len, IN
 
 }
 
-U2 EncryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_text, IN U4 plain_len, OUT U1 *cipher, OUT U4 *cipher_len, IN U1 req_tag_len, OUT U1 *tag, OUT U4 *tag_len, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
+
+U2 EncryptKeyAriaCtr(IN U1 *kek, IN U1 *key, IN U4 key_len, OUT U1 *enc_key, OUT U4 *enc_key_len)
+{
+	U2 ret = 0;
+	U4 outl = 0;
+	U1 iv[] = { 0x0f, 0x02, 0x05, 0x03, 0x08, 0x05, 0x07, 0xaa, 0xbb, 0xcc, 0xda, 0xfb, 0xcc, 0xd0, 0xe0, 0xf0 }; // 16bytes
+	EVP_CIPHER_CTX *ctx = NULL;
+
+    U1 *enc_key_buf = NULL;
+    // U4 enc_key_buf_len = plain_len; // if NOT padding
+    int nBytesWritten = 0;
+
+    const EVP_CIPHER *evp_cipher = EVP_get_cipherbyname("aria-256-ctr"); // KEK len : 32byte
+    ctx = EVP_CIPHER_CTX_new();
+
+    if((evp_cipher == NULL) || (ctx == NULL))
+    {
+        printf("evp_cipher_enc OR evp_ctx_enc is NULL\n");
+        return 1;
+    }
+
+    /* Encryption INIT */
+    if(!EVP_EncryptInit(ctx, evp_cipher, kek, iv))
+		HandleErrors();
+
+    enc_key_buf = (U1 *)malloc(key_len);
+    if(enc_key_buf == NULL)
+    {
+        printf("enc key buf malloc failed\n");
+        return 1;
+    }
+
+    if(!EVP_EncryptUpdate(ctx, &enc_key_buf[outl], &nBytesWritten, key, key_len))
+		HandleErrors();
+    outl += nBytesWritten;
+
+    if(!EVP_EncryptFinal(ctx, &enc_key_buf[outl], &nBytesWritten))
+		HandleErrors();
+    outl += nBytesWritten;
+
+    memcpy(enc_key, enc_key_buf, outl);
+    *enc_key_len = outl;
+
+	free(enc_key_buf);
+	EVP_CIPHER_CTX_free(ctx);
+}
+
+U2 DecryptKeyAriaCtr(IN U1 *kek, IN U1 *enc_key, IN U4 enc_key_len, OUT U1 *key, OUT U4 *key_len)
+{
+	U2 ret = 0;
+	U4 outl = 0;
+	EVP_CIPHER_CTX *ctx = NULL;
+
+	U1 iv[] = { 0x0f, 0x02, 0x05, 0x03, 0x08, 0x05, 0x07, 0xaa, 0xbb, 0xcc, 0xda, 0xfb, 0xcc, 0xd0, 0xe0, 0xf0 }; // 16bytes
+
+    int nBytesWritten = 0;
+
+	U1 *key_buf = NULL;
+
+    const EVP_CIPHER *evp_cipher = EVP_get_cipherbyname("aria-128-ctr");
+    ctx = EVP_CIPHER_CTX_new();
+
+    if((evp_cipher == NULL) || (ctx == NULL))
+    {
+        printf("evp_cipher_dec OR evp_ctx_dec is NULL\n");
+        return 0xffff;
+    }
+
+    /* Encryption INIT */
+    if(!EVP_DecryptInit(ctx, evp_cipher, kek, iv))
+		HandleErrors();
+
+	key_buf = (U1 *)malloc(enc_key_len);
+	if(key_buf == NULL)
+	{
+		printf("key buf malloc failed\n");
+		return 1;
+	}
+
+	if(!EVP_DecryptUpdate(ctx, &key_buf[outl], &nBytesWritten, enc_key, enc_key_len))
+		HandleErrors();
+    outl += nBytesWritten;
+
+	ret = EVP_DecryptFinal(ctx, &key_buf[outl], &nBytesWritten);
+	outl += nBytesWritten;
+
+	memcpy(key, key_buf, outl);
+	*key_len = outl;
+
+	free(key_buf);
+	EVP_CIPHER_CTX_free(ctx);
+}
+
+
+
+U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_text, IN U4 plain_len, OUT U1 *cipher, OUT U4 *cipher_len, IN U1 req_tag_len, OUT U1 *tag, OUT U4 *tag_len, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
 {
 	U2 ret = 0;
 	U4 outl = 0;
 	EVP_CIPHER_CTX *ctx = NULL;
 	U1 str_block_mode[12] = {0x00, };
+
+	//U1 key[32] = {0, };
+    //U4 key_len = 0;
 
     U1 *cipher_buf = NULL;
     U4 cipher_buf_len = 0;
@@ -554,7 +709,21 @@ U2 EncryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_te
 	U4 tag_buf_len = 0;
 	U1 tag_buf[17] = {0, };
 
-    U4 key_len = 32;
+
+	/* Available index 0:4 */
+	if (key_idx < 0 && key_idx > 4)
+	{
+		PrintErrMsg(0xfe03);
+		return 0;
+	}
+
+	U1 key[32] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B, 0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B};
+	//U1 key[16] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B};
+	U4 key_len = 32;
+
+//	ret = GetKeyAriaAes(key_idx, key, &key_len);
+//	printf("key (length : %d)\n", key_len);
+//	DebugPrintArr(key, key_len);
 
     switch(block_mode)
     {
@@ -584,7 +753,8 @@ U2 EncryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_te
     }
 
     /* Encryption INIT */
-    if(!EVP_EncryptInit(ctx, evp_cipher, key, iv))
+    //if(!EVP_EncryptInit(ctx, evp_cipher, key, iv))
+    if(!EVP_DecryptInit(ctx, EVP_aes_256_ecb() , key, iv))
 		HandleErrors();
 
 	if(block_mode == MODE_GCM)
@@ -606,11 +776,12 @@ U2 EncryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_te
 		return 1;
 	}
 
-    if(!EVP_CIPHER_CTX_set_padding(ctx, padding_flag))
+	if(!EVP_CIPHER_CTX_set_padding(ctx, padding_flag))
 		HandleErrors();
 
-	/* Expand length of cipher buffer for padding */
-    cipher_buf_len = plain_len + EVP_CIPHER_CTX_block_size(ctx);
+	/* Expand length of cipher buffer for padding (ECB, CBC) */
+	cipher_buf_len = plain_len + EVP_CIPHER_CTX_block_size(ctx);
+
 
     cipher_buf = (U1 *)malloc(cipher_buf_len);
     if(cipher_buf == NULL)
@@ -644,7 +815,7 @@ U2 EncryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_te
 	EVP_CIPHER_CTX_free(ctx);
 }
 
-U2 DecryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher_text, IN U4 cipher_len,  OUT U1 *plain, OUT U4 *plain_len, IN U1 *tag, IN U1 tag_len, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
+U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher_text, IN U4 cipher_len,  OUT U1 *plain, OUT U4 *plain_len, IN U1 *tag, IN U1 tag_len, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
 {
 	U2 ret = 0;
 	U4 outl = 0;
@@ -656,7 +827,26 @@ U2 DecryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher_t
     U4 plain_buf_len = 0;
 	U1 *plain_buf = NULL;
 
-    U4 key_len = 16;
+//	U1 key[32] = {0, };
+ //   U4 key_len = 0;
+
+	//U1 key[32] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B};
+	U1 key[32] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B, 0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B};
+	//U1 key[16] =	{0x7D,0xF4,0xFD,0x58,0x3C,0xCA,0xA6,0xBF,0x05,0xCF,0xA3,0x19,0xCB,0xC4,0x7A,0x1B};
+	U4 key_len = 32;
+
+	/* Available index 0:4 */
+	if (key_idx < 0 && key_idx > 4)
+	{
+		PrintErrMsg(0xfe03);
+		return 0;
+	}
+	printf("Cipher Text (length : %d)\n", cipher_len);
+	DebugPrintArr(cipher_text, cipher_len);
+
+	//ret = GetKeyAriaAes(key_idx, key, &key_len);
+	//printf("Decrypt key (len : %d)\n", key_len);
+	//DebugPrintArr(key, key_len);
 
     switch(block_mode)
     {
@@ -675,9 +865,11 @@ U2 DecryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher_t
         default :
             break;
     }
+	printf("%s\n", str_block_mode);
 
     const EVP_CIPHER *evp_cipher = EVP_get_cipherbyname(str_block_mode);
-    ctx = EVP_CIPHER_CTX_new();
+    if(!(ctx = EVP_CIPHER_CTX_new()))
+		HandleErrors();
 
     if((evp_cipher == NULL) || (ctx == NULL))
     {
@@ -685,20 +877,24 @@ U2 DecryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher_t
         return 0xffff;
     }
 
-    /* Encryption INIT */
-    if(!EVP_DecryptInit(ctx, evp_cipher, key, iv))
+    /* Decryption INIT */
+	/*
+	if(!EVP_DecryptInit_ex(ctx, evp_cipher, NULL, NULL, NULL))
+        HandleErrors();
+		*/
+	
+    //if(!EVP_DecryptInit(ctx, evp_cipher, key, iv))
+    if(!EVP_DecryptInit(ctx, EVP_aes_256_ecb() , key, iv))
 		HandleErrors();
 
+
 	if(block_mode == MODE_GCM)
-    {
-        ret = EVP_DecryptUpdate(ctx, NULL, (int *)&outl, (const unsigned char*)aad, aad_len);
-        if(!ret)
-        {
-            printf("EVP_EncryptUpdate aad ERROR\n");
-            return 0xffff;
-        }
+	{
+	
+		if(!EVP_DecryptUpdate(ctx, NULL, (int *)&outl, (const unsigned char*)aad, aad_len))
+			HandleErrors();
 		outl = 0; // Init 0 for update
-    }
+	}
 
 	if((padding_flag == NONE_PADDING_BLOCK) && (((int)cipher_len % EVP_CIPHER_CTX_block_size(ctx)) != 0))
 	{
@@ -710,11 +906,14 @@ U2 DecryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher_t
 		HandleErrors();
 
     plain_buf_len = cipher_len + EVP_CIPHER_CTX_block_size(ctx);
-	plain_buf = (U1 *)malloc(sizeof(U1) * plain_buf_len);
+	printf("plain buf len : %d\n", plain_buf_len);
+	plain_buf = (U1 *)malloc(plain_buf_len);
 
+	//printf("outl : %d\n", outl);
     if(!EVP_DecryptUpdate(ctx, &plain_buf[outl], &nBytesWritten, cipher_text, cipher_len))
 		HandleErrors();
-    outl += nBytesWritten;
+    outl = nBytesWritten;
+	printf("outl1 : %d\n", outl);
 
 	if(block_mode == MODE_GCM)
 	{
@@ -722,22 +921,27 @@ U2 DecryptARIA(IN U1 *key, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher_t
 			HandleErrors();
 	}
 
-	ret = EVP_DecryptFinal(ctx, &plain[outl], &nBytesWritten);
+	DebugPrintArr(plain_buf, plain_buf_len);
+
+	printf("outl2 : %d\n", outl);
+	if(!(ret = EVP_DecryptFinal_ex(ctx, &plain_buf[outl], &nBytesWritten)))
+		HandleErrors();
+	printf("outl3 : %d\n", outl);
+
 
 	memcpy(plain, plain_buf, outl);
+	*plain_len = outl;
+
 	free(plain_buf);
 	EVP_CIPHER_CTX_free(ctx);
 
 	if(ret > 0)
 	{
 		outl += nBytesWritten;
-		*plain_len = outl;
-
 		return SUCCESS;
 	}
 	else
 	{
 		printf("Tag is NOT same\n");
-		HandleErrors();
 	}
 }

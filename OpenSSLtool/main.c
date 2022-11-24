@@ -1,6 +1,6 @@
 /*******************
 Author : Gunwoo Yun
-Date : 22.11.23
+Date : 22.11.24
 Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify ECDSA_sign_verify
 
 *******************/
@@ -77,9 +77,6 @@ void init_data()
 	assert(writtenBytes == 32);
 	writtenBytes = fwrite(salt, sizeof(U1) /* 1byte */, sizeof(salt), fp_data);
 	assert(writtenBytes == 32);
-	
-	/* sym key data set 0xff */
-	// writtenBytes = fwrite(0xff, sizeof(U1) /* 1byte */, 3 + (32 * 3), fp_data);
 
 	fclose(fp_data);
 
@@ -149,36 +146,6 @@ void log_in()
 
 	}
 	fclose(fp_data);
-	/*
-	   printf("read data ID : %s\n", id);
-	printf("read data PW\n");
-	DebugPrintArr(pw, 32);
-	fclose(fp_data);
-	*/
-
-#if 0
-	memcpy(salt_pw, salt, salt_len); // push salt into salt_pw
-	memcpy(salt_pw + salt_len, pw, sizeof(pw)-1); // push pw into salt_pw
-	//printf("salt + pw\n");
-	//DebugPrintArr(salt_pw, sizeof(salt_pw));
-	//printf("\n");
-
-	Sha256(salt_pw, sizeof(salt_pw), hashed_salt_pw); // first hash
-
-	/* Iterate hash 1000 times*/
-	for(int i = 0; i < 1000; i++)
-	{
-		Sha256(hashed_salt_pw, sizeof(hashed_salt_pw), hashed_salt_pw);
-	}
-	Sha256(hashed_salt_pw, sizeof(hashed_salt_pw), KEK);
-
-	//DebugPrintArr(hashed_salt_pw, sizeof(hashed_salt_pw));
-	printf("\n");
-
-	//printf("<< KEK >>\n");
-	//DebugPrintArr(KEK, sizeof(KEK));
-#endif
-
 }
 
 
@@ -186,13 +153,11 @@ int main(int argc, char **argv)
 {
 	U2 ret = 0;
 	log_in();
-	log_in();
-	printf("KEK\n");
-	DebugPrintArr(KEK, 32);
-	ret = GenAriaAesKey(0x00, 0x10);
-	DebugPrintLine();
-	ret = GenAriaAesKey(0x01, 32);
-	printf("ret2 : %d\n", ret);
+	//log_in();
+	//ret = GenKeyAriaAes(0x00, 0x10);
+	//ret = GenkeyAriaAes(0x01, 32);
+	//ret = GenKeyAriaAes(0x02, 24);
+	//printf("ret2 : %d\n", ret);
 	U1 key[1024] = {0, };
 	U1 iv[] = { 0x0f, 0x02, 0x05, 0x03, 0x08, 0x05, 0x07, 0xaa, 0xbb, 0xcc, 0xda, 0xfb, 0xcc, 0xd0, 0xe0, 0xf0 }; // 16bytes
 	U1 aad[] = { 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF };	// 16 Bytes
@@ -239,6 +204,19 @@ int main(int argc, char **argv)
 	ret = Gen_EC_key(NID_secp256k1, &ec_key);
 
 
+	printf("******* ARIA Encryption Start ************\n");
+	printf("Plain Text (lenth : %d)\n", sizeof(plain));
+	DebugPrintArr(plain, sizeof(plain));
+
+	ret = EncryptARIA(0x00, PADDING_BLOCK, MODE_ECB, plain, sizeof(plain), cipher, &cipher_len, req_tag_len, tag, &tag_len, sizeof(iv), iv, sizeof(aad), aad);
+	
+	printf("******* ARIA Decryption Start ************\n");
+	memset(plain, 0, sizeof(plain)); // plain buffer init 0
+
+	ret =  DecryptARIA(0x00, PADDING_BLOCK, MODE_ECB, cipher, cipher_len, plain, &plain_len, tag, tag_len, sizeof(iv), iv, sizeof(aad), aad);
+
+	printf("Plain Text\n");
+	DebugPrintArr(plain, plain_len);
 
 #if 0
 	printf("******* ECDSA Signification ************\n");
