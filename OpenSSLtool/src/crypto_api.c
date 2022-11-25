@@ -698,8 +698,8 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 	EVP_CIPHER_CTX *ctx = NULL;
 	U1 str_block_mode[12] = {0x00, };
 
-	U1 key[32] = {0, };
-    U4 key_len = 0;
+	U1 *key = NULL;
+	U4 key_len = 0;
 
     U1 *cipher_buf = NULL;
     U4 cipher_buf_len = 0;
@@ -717,6 +717,8 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 		return 0;
 	}
 
+	
+	key = malloc(32);
 	ret = GetKeyAriaAes(key_idx, key, &key_len);
 
     switch(block_mode)
@@ -773,8 +775,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 		HandleErrors();
 
 	/* Expand length of cipher buffer for padding (ECB, CBC) */
-	//cipher_buf_len = plain_len + EVP_CIPHER_CTX_block_size(ctx);
-
+	cipher_buf_len = plain_len + EVP_CIPHER_CTX_block_size(ctx);
 
     cipher_buf = (U1 *)malloc(cipher_buf_len);
     if(cipher_buf == NULL)
@@ -785,7 +786,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 
     if(!EVP_EncryptUpdate(ctx, &cipher_buf[outl], &nBytesWritten, plain_text, plain_len))
 		HandleErrors();
-    outl = nBytesWritten;
+    outl += nBytesWritten;
 
     if(!EVP_EncryptFinal(ctx, &cipher_buf[outl], &nBytesWritten))
 		HandleErrors();
@@ -805,22 +806,20 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 	}
 
 	free(cipher_buf);
+	free(key);
 	EVP_CIPHER_CTX_free(ctx);
 }
 
-U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher_text, IN U4 cipher_len,  OUT U1 *plain, OUT U4 *plain_len, IN U1 *tag, IN U1 tag_len, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
+U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher, IN U4 cipher_len,  OUT U1 *plain, OUT U4 *plain_len, IN U1 *tag, IN U1 tag_len, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
 {
 	U2 ret = 0;
-	U4 outl = 0;
+	U4 out_len = 0;
 	EVP_CIPHER_CTX *ctx = NULL;
 	U1 str_block_mode[12] = {0x00, };
 
     int nBytesWritten = 0;
 
-    U4 plain_buf_len = 0;
-	U1 *plain_buf = NULL;
-
-	U1 key[32] = {0, };
+	U1 *key = NULL;
     U4 key_len = 0;
 
 	/* Available index 0:4 */
@@ -830,9 +829,8 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
 		return 0;
 	}
 
+	key = malloc(32);
 	ret = GetKeyAriaAes(key_idx, key, &key_len);
-	printf("enc Key len : %d\n", key_len);
-	DebugPrintArr(key, key_len);
 
     switch(block_mode)
     {
@@ -863,11 +861,6 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
     }
 
     /* Decryption INIT */
-	/*
-	if(!EVP_DecryptInit_ex(ctx, evp_cipher, NULL, NULL, NULL))
-        HandleErrors();
-		*/
-	
     if(!EVP_DecryptInit(ctx, evp_cipher, key, iv))
 		HandleErrors();
 
@@ -875,9 +868,9 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
 	if(block_mode == MODE_GCM)
 	{
 	
-		if(!EVP_DecryptUpdate(ctx, NULL, (int *)&outl, (const unsigned char*)aad, aad_len))
+		if(!EVP_DecryptUpdate(ctx, NULL, (int *)&out_len, (const unsigned char*)aad, aad_len))
 			HandleErrors();
-		outl = 0; // Init 0 for update
+		out_len = 0; // Init 0 for update
 	}
 
 	if((padding_flag == NONE_PADDING_BLOCK) && (((int)cipher_len % EVP_CIPHER_CTX_block_size(ctx)) != 0))
@@ -889,21 +882,9 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
     if(!EVP_CIPHER_CTX_set_padding(ctx, padding_flag))
 		HandleErrors();
 
-    //plain_buf_len = cipher_len;
-    plain_buf_len = cipher_len + EVP_CIPHER_CTX_block_size(ctx);
-	//printf("block size : %d\n", EVP_CIPHER_CTX_block_size(ctx));
-	printf("plain buf len : %d\n", plain_buf_len);
-	plain_buf = (U1 *)malloc(plain_buf_len);
-	if(plain_buf == NULL)
-		assert(plain_buf!=NULL);
-	DebugPrintLine();
-
-    if(!EVP_DecryptUpdate(ctx, &plain_buf[outl], &nBytesWritten, cipher_text, cipher_len))
+    if(!EVP_DecryptUpdate(ctx, plain, &nBytesWritten, cipher, cipher_len))
 		HandleErrors();
-    outl = nBytesWritten;
-	DebugPrintLine();
-	plain_buf[outl] = 0xff;
-	printf("outl : %d\n", outl);
+    out_len += nBytesWritten;
 
 	if(block_mode == MODE_GCM)
 	{
@@ -911,24 +892,21 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
 			HandleErrors();
 	}
 
-	if(!(ret = EVP_DecryptFinal(ctx, &plain_buf[outl], &nBytesWritten)))
+	if(!(ret = EVP_DecryptFinal(ctx, plain + out_len, &nBytesWritten)))
 		HandleErrors();
-	printf("outl1 : %d\n", outl);
+	out_len += nBytesWritten;
+	*plain_len = out_len;
 
-
-	memcpy(plain, plain_buf, outl);
-	*plain_len = outl;
-
-	free(plain_buf);
+	free(key);
 	EVP_CIPHER_CTX_free(ctx);
 
 	if(ret > 0)
 	{
-		outl += nBytesWritten;
 		return SUCCESS;
 	}
 	else
 	{
 		printf("Tag is NOT same\n");
+		return 0x0fe3;
 	}
 }
