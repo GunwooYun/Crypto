@@ -12,8 +12,6 @@ Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify ECDSA_sign_verify
 #include "./inc/defines.h"
 #include "./inc/crypto_api.h"
 
-#define TEXT_LENGTH 64
-
 U1 flag_need_init = 0;
 extern U1 KEK[32];
 
@@ -152,11 +150,13 @@ void log_in()
 int main(int argc, char **argv)
 {
 	U2 ret = 0;
+	/*
 	log_in();
 	log_in();
 	ret = GenKeyAriaAes(0x00, 0x10);
 	ret = GenKeyAriaAes(0x01, 32);
 	ret = GenKeyAriaAes(0x02, 24);
+	*/
 	//printf("ret2 : %d\n", ret);
 	//U1 key[1024] = {0, };
 	U1 iv[] = { 0x0f, 0x02, 0x05, 0x03, 0x08, 0x05, 0x07, 0xaa, 0xbb, 0xcc, 0xda, 0xfb, 0xcc, 0xd0, 0xe0, 0xf0 }; // 16bytes
@@ -215,6 +215,11 @@ int main(int argc, char **argv)
 
 	printf("cipher (length : %d)\n", cipher_len);
 	DebugPrintArr(cipher, cipher_len);
+	printf("\n\n");
+	printf("Tag\n");
+	DebugPrintArr(tag, tag_len);
+
+	//cipher[0] = 0xff;
 	
 	printf("******* ARIA Decryption Start ************\n");
 	memset(plain, 0, sizeof(plain)); // plain buffer init 0

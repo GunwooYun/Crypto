@@ -717,6 +717,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 		return 0;
 	}
 
+
 	
 	key = malloc(32);
 	ret = GetKeyAriaAes(key_idx, key, &key_len);
@@ -892,8 +893,11 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
 			HandleErrors();
 	}
 
+	/*
 	if(!(ret = EVP_DecryptFinal(ctx, plain + out_len, &nBytesWritten)))
 		HandleErrors();
+	*/
+	ret = EVP_DecryptFinal(ctx, plain + out_len, &nBytesWritten);
 	out_len += nBytesWritten;
 	*plain_len = out_len;
 
