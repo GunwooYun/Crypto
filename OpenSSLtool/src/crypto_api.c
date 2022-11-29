@@ -222,6 +222,7 @@ U2 encrypt_RSAES_OAEP(IN U1 *rsa_key, IN U1 *plain, IN U4 plain_len, OUT U1 * ci
 
 U2 encrypt_RSAES_OAEP(IN RSA *rsa_key, IN U1 *plain, IN U4 plain_len, OUT U1 * cipher, OUT U4 *cipher_len)
 {
+	DebugPrintArr(plain, plain_len);
 	//int ret = 0;
 	*cipher_len = RSA_public_encrypt(plain_len, plain, cipher, rsa_key, RSA_PKCS1_OAEP_PADDING);
 	//printf("cipher length : %d\n", (unsigned int)*cipher_len);
@@ -691,7 +692,7 @@ U2 DecryptKeyAriaCtr(IN U1 *kek, IN U1 *enc_key, IN U4 enc_key_len, OUT U1 *key,
 
 
 
-U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_text, IN U4 plain_len, OUT U1 *cipher, OUT U4 *cipher_len, IN U1 req_tag_len, OUT U1 *tag, OUT U4 *tag_len, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
+U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_text, IN U4 plain_len, OUT U1 *cipher, OUT U4 *cipher_len, IN U1 req_tag_len, OUT U1 *tag, OUT U4 *tag_len, IN U2 iv_len, IN const U1 *iv, IN U2 aad_len, IN const U1 *aad)
 {
 	U2 ret = 0;
 	U4 outl = 0;
@@ -703,7 +704,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 
     U1 *cipher_buf = NULL;
     U4 cipher_buf_len = 0;
-    int nBytesWritten = 0;
+    int writtenBytes = 0;
 
 	/* variable for TAG */
 	U4 tag_buf_len = 0;
@@ -713,15 +714,14 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 	/* Available index 0:4 */
 	if (key_idx < 0 && key_idx > 4)
 	{
-		PrintErrMsg(0xfe03);
 		return 0;
 	}
-
-
 	
-	key = malloc(32);
+	/* 저장된 파일로부터 키 로드 */
+	key = malloc(MAX_KEY_SIZE);
 	ret = GetKeyAriaAes(key_idx, key, &key_len);
 
+	/* 블록모드 선택 */
     switch(block_mode)
     {
         case MODE_ECB :
@@ -746,7 +746,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
     if((evp_cipher == NULL) || (ctx == NULL))
     {
         printf("evp_cipher_enc OR evp_ctx_enc is NULL\n");
-        return 1;
+        return 0;
     }
 
     /* Encryption INIT */
@@ -758,7 +758,7 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 		/* Tag length should be in the range below */
 		if(req_tag_len > 16 || req_tag_len < 12){
 			printf("required tag length wrong\n");
-			return 1;
+			return 0;
 		}
 
 		if(!EVP_EncryptUpdate(ctx, NULL, (int *)&outl, (const unsigned char*)aad, aad_len))
@@ -766,10 +766,11 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 		outl = 0; // init 0 for update
 	}
 
+	/* 패딩모드가 아닐 경우 평문의 길이는 블록사이즈의 배수 */
 	if((padding_flag == NONE_PADDING_BLOCK) && (((int)plain_len % EVP_CIPHER_CTX_block_size(ctx)) != 0))
 	{
 		printf("None padding mode failed => Check plain length (NOT multiple of block)\n");
-		return 1;
+		return 0;
 	}
 
 	if(!EVP_CIPHER_CTX_set_padding(ctx, padding_flag))
@@ -782,16 +783,16 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
     if(cipher_buf == NULL)
     {
         printf("cipher buf malloc failed\n");
-        return 1;
+        return 0;
     }
 
-    if(!EVP_EncryptUpdate(ctx, &cipher_buf[outl], &nBytesWritten, plain_text, plain_len))
+    if(!EVP_EncryptUpdate(ctx, &cipher_buf[outl], &writtenBytes, plain_text, plain_len))
 		HandleErrors();
-    outl += nBytesWritten;
+    outl += writtenBytes;
 
-    if(!EVP_EncryptFinal(ctx, &cipher_buf[outl], &nBytesWritten))
+    if(!EVP_EncryptFinal(ctx, &cipher_buf[outl], &writtenBytes))
 		HandleErrors();
-    outl += nBytesWritten;
+    outl += writtenBytes;
 
     memcpy(cipher, cipher_buf, outl);
     *cipher_len = outl;
@@ -811,14 +812,14 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 	EVP_CIPHER_CTX_free(ctx);
 }
 
-U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher, IN U4 cipher_len,  OUT U1 *plain, OUT U4 *plain_len, IN U1 *tag, IN U1 tag_len, IN U2 iv_len, IN U1 *iv, IN U2 aad_len, IN U1 *aad)
+U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *cipher, IN U4 cipher_len,  OUT U1 *plain, OUT U4 *plain_len, IN U1 *tag, IN U1 tag_len, IN U2 iv_len, IN const U1 *iv, IN U2 aad_len, IN const U1 *aad)
 {
 	U2 ret = 0;
-	U4 out_len = 0;
+	U4 outl = 0;
 	EVP_CIPHER_CTX *ctx = NULL;
 	U1 str_block_mode[12] = {0x00, };
 
-    int nBytesWritten = 0;
+    int writtenBytes = 0;
 
 	U1 *key = NULL;
     U4 key_len = 0;
@@ -826,11 +827,10 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
 	/* Available index 0:4 */
 	if (key_idx < 0 && key_idx > 4)
 	{
-		PrintErrMsg(0xfe03);
 		return 0;
 	}
 
-	key = malloc(32);
+	key = malloc(MAX_KEY_SIZE);
 	ret = GetKeyAriaAes(key_idx, key, &key_len);
 
     switch(block_mode)
@@ -858,7 +858,7 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
     if((evp_cipher == NULL) || (ctx == NULL))
     {
         printf("evp_cipher_dec OR evp_ctx_dec is NULL\n");
-        return 0xffff;
+        return 0;
     }
 
     /* Decryption INIT */
@@ -869,23 +869,23 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
 	if(block_mode == MODE_GCM)
 	{
 	
-		if(!EVP_DecryptUpdate(ctx, NULL, (int *)&out_len, (const unsigned char*)aad, aad_len))
+		if(!EVP_DecryptUpdate(ctx, NULL, (int *)&outl, (const unsigned char*)aad, aad_len))
 			HandleErrors();
-		out_len = 0; // Init 0 for update
+		outl = 0; // Init 0 for update
 	}
 
 	if((padding_flag == NONE_PADDING_BLOCK) && (((int)cipher_len % EVP_CIPHER_CTX_block_size(ctx)) != 0))
 	{
 		printf("None padding mode failed => Check plain length (NOT multiple of block)\n");
-		return 1;
+		return 0;
 	}
 
     if(!EVP_CIPHER_CTX_set_padding(ctx, padding_flag))
 		HandleErrors();
 
-    if(!EVP_DecryptUpdate(ctx, plain, &nBytesWritten, cipher, cipher_len))
+    if(!EVP_DecryptUpdate(ctx, plain, &writtenBytes, cipher, cipher_len))
 		HandleErrors();
-    out_len += nBytesWritten;
+    outl += writtenBytes;
 
 	if(block_mode == MODE_GCM)
 	{
@@ -893,24 +893,20 @@ U2 DecryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *ciphe
 			HandleErrors();
 	}
 
-	/*
-	if(!(ret = EVP_DecryptFinal(ctx, plain + out_len, &nBytesWritten)))
-		HandleErrors();
-	*/
-	ret = EVP_DecryptFinal(ctx, plain + out_len, &nBytesWritten);
-	out_len += nBytesWritten;
-	*plain_len = out_len;
+	ret = EVP_DecryptFinal(ctx, plain + outl, &writtenBytes);
+	outl += writtenBytes;
+	*plain_len = outl;
 
 	free(key);
 	EVP_CIPHER_CTX_free(ctx);
 
 	if(ret > 0)
 	{
-		return SUCCESS;
+		return 1;
 	}
 	else
 	{
 		printf("Tag is NOT same\n");
-		return 0x0fe3;
+		return 0;
 	}
 }
