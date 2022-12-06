@@ -180,7 +180,7 @@ U2 sign_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len, OUT U1 *sign, OUT U4
 	sign_buf = OPENSSL_malloc(sign_buf_len);
 	if(sign_buf == NULL){
 		printf("malloc failure\n");
-		return 0x0f00;
+		return 0;
 	}
 
 	if (EVP_PKEY_sign(ctx, sign_buf, &sign_buf_len, md, md_len) <= 0) HandleErrors();
@@ -190,8 +190,6 @@ U2 sign_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len, OUT U1 *sign, OUT U4
 
 	OPENSSL_free(sign_buf);
 	EVP_PKEY_CTX_free(ctx);
-	//EVP_PKEY_free(pkey);
-	//EVP_MD_CTX_free(md_ctx);
 }
 
 #if 0
@@ -223,21 +221,18 @@ U2 encrypt_RSAES_OAEP(IN U1 *rsa_key, IN U1 *plain, IN U4 plain_len, OUT U1 * ci
 U2 encrypt_RSAES_OAEP(IN RSA *rsa_key, IN U1 *plain, IN U4 plain_len, OUT U1 * cipher, OUT U4 *cipher_len)
 {
 	DebugPrintArr(plain, plain_len);
-	//int ret = 0;
 	*cipher_len = RSA_public_encrypt(plain_len, plain, cipher, rsa_key, RSA_PKCS1_OAEP_PADDING);
-	//printf("cipher length : %d\n", (unsigned int)*cipher_len);
-	if(cipher_len == 0) return 0x0f00;
-	else return 0x9000;
 
+	if(cipher_len == 0) return 0;
+	else return 1;
 }
 
 U2 decrypt_RSAES_OAEP(IN RSA *rsa_key, IN U1 *cipher, IN U4 cipher_len, OUT U1 *plain, OUT U4 *plain_len)
 {
-	//int ret = 0;
 	*plain_len = RSA_private_decrypt(cipher_len, cipher, plain, rsa_key, RSA_PKCS1_OAEP_PADDING);
-	if(plain_len == 0) return 0x0f00;
-	else return 0x9000;
 
+	if(plain_len == 0) return 0;
+	else return 1;
 }
 
 U2 GenRsaKey(IN U4 key_len, OUT RSA **rsa_key, OUT U1 *pub_key, OUT U1 *pri_key)
@@ -394,7 +389,6 @@ U2 GetKeyAriaAes(IN U1 key_idx, OUT U1 *key, OUT U4 *key_len)
 	fp_data = fopen("./.data", "rb");
 	if(fp_data == NULL)
 	{
-		PrintErrMsg(0xd284);
 		return 0;
 	}
 
@@ -413,7 +407,6 @@ U2 GetKeyAriaAes(IN U1 key_idx, OUT U1 *key, OUT U4 *key_len)
 	}
 	else
 	{
-		PrintErrMsg(0x003f);
 		fclose(fp_data);
 		return 0;
 	}
@@ -514,13 +507,34 @@ U2 Sha256(IN U1 *msg, IN U4 msg_len, OUT U1 *md)
 	return 0x9000;
 }
 
-U2 HmacSha256(IN U1 *key, IN U4 key_len, IN U1 *msg, IN U4 msg_len, OUT U1 *md, OUT U4 *md_len)
+U2 HmacSha256(IN U1 key_idx, IN U1 *msg, IN U4 msg_len, OUT U1 *md, OUT U4 *md_len)
 {
 	int ret = 0;
+
+	U1 *key = NULL;
+	U4 key_len = 0;
+
+	/* Available index 0:4 */
+	if (key_idx < 0 && key_idx > 4)
+	{
+		return 0;
+	}
+	
+	/* 저장된 파일로부터 키 로드 */
+	key = malloc(MAX_KEY_SIZE);
+	ret = GetKeyAriaAes(key_idx, key, &key_len);
+	printf("key : ");
+	DebugPrintArr(key, key_len);
+	if(!ret)
+	{
+		printf("Get key error!\n");
+		return 0;
+	}
+
 	HMAC_CTX *ctx = HMAC_CTX_new();
 	if(!ctx){
 		printf("HMAC_CTX_new() is NULL\n");
-		return 0xffff;
+		return 0;
 	}
 
 	if(!HMAC_Init_ex(ctx, key, (int)key_len, EVP_sha256(), NULL))
@@ -532,9 +546,10 @@ U2 HmacSha256(IN U1 *key, IN U4 key_len, IN U1 *msg, IN U4 msg_len, OUT U1 *md, 
 	if(!HMAC_Final(ctx, md, md_len))
 		HandleErrors();
 
+	free(key);
 	HMAC_CTX_free(ctx);
 
-	return 0x9000;
+	return 1;
 }
 
 U2 GmacGetTag(IN U1 *key, IN U1 *iv, IN U4 iv_len, IN U1 *aad, IN U4 aad_len, IN U4 req_tag_len, OUT U1 *tag, OUT U4 *tag_len)
@@ -720,6 +735,11 @@ U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain
 	/* 저장된 파일로부터 키 로드 */
 	key = malloc(MAX_KEY_SIZE);
 	ret = GetKeyAriaAes(key_idx, key, &key_len);
+	if(!ret)
+	{
+		printf("Get key error!\n");
+		return 0;
+	}
 
 	/* 블록모드 선택 */
     switch(block_mode)

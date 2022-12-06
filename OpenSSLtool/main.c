@@ -45,6 +45,7 @@ void init_data()
 	if(fp_data != NULL)
 	{
 		printf("Already Initialized\n");
+		return;
 	}
 
 	printf("Initialize Data\n");
@@ -151,6 +152,7 @@ void log_in()
 
 	}
 	fclose(fp_data);
+	printf("Log-in Success\n");
 }
 
 
@@ -163,7 +165,15 @@ int main(int argc, char **argv)
 	
 	//log_in();
 
-	testAria();
+	//GenKeyAriaAes(0x00, 16);	
+	//GenKeyAriaAes(0x01, 24);	
+	//GenKeyAriaAes(0x02, 32);	
+
+	//testAria();
+	//testSha256();
+	//testHmac();
+
+	 testRSA_enc_dec();
 
 
 

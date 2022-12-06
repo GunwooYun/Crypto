@@ -84,9 +84,12 @@ void testRSA_enc_dec(void)
 
     DebugPrintArr(cipher, cipher_len);
 
+    printf("******* RSA Decryption ************\n");
     ret = decrypt_RSAES_OAEP(rsa_key, cipher, cipher_len, pt, &msg_len);
+    printf("message length : %d\n", msg_len);
 
-    ret = RSA_private_decrypt(cipher_len, cipher, pt, rsa_key, RSA_PKCS1_OAEP_PADDING);
+
+    //ret = RSA_private_decrypt(cipher_len, cipher, pt, rsa_key, RSA_PKCS1_OAEP_PADDING);
 
     printf("%s\n", pt);
 }
@@ -98,7 +101,8 @@ void testSha256(void)
     U1 hmacData[30] = {"hello,world"};
 
 	printf("******* SHA-256 TEST ************\n");
-    DebugPrintArr(hmacData, (U4)strlen(hmacData));
+    //DebugPrintArr(hmacData, (U4)strlen(hmacData));
+	printf("message : %s\n", hmacData);
     Sha256(hmacData, (U4)strlen(hmacData), msgDgst);
     DebugPrintArr(msgDgst, 32);
 }
@@ -135,6 +139,7 @@ void testHmac(void)
     U1 hmacData[30] = {"hello,world"};
     memset(msgDgst, 0, 3400);
 
+	/*
     U1 key_index = 0x00;
     U1 *key = NULL;
     U4 key_len = 0;
@@ -143,12 +148,14 @@ void testHmac(void)
     if(key == NULL) assert(key == NULL);
 
     ret = GetKeyAriaAes(key_index, key, &key_len);
+	*/
 
-    DebugPrintArr(hmacData, (U4)strlen(hmacData));
-    ret = HmacSha256(key, key_len, hmacData, (U4)strlen(hmacData), msgDgst, &msgDgst_len);
+    //DebugPrintArr(hmacData, (U4)strlen(hmacData));
+	printf("message : %s\n", hmacData);
+    ret = HmacSha256(0x01, hmacData, (U4)strlen(hmacData), msgDgst, &msgDgst_len);
     DebugPrintArr(msgDgst, msgDgst_len);
 
-    free(key);
+    //free(key);
 }
 
 void testAria(void)
