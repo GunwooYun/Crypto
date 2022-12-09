@@ -43,18 +43,73 @@ void testRSA_sign_verify(void)
     U1 public_key[4096] = {0, };
     U1 private_key[4096] = {0, };
 
-    U1 sign[32] = {0x00, };
+    U1 sign[4096] = {0x00, };
     U4 sign_len = 0;
 
     RSA *rsa_key = NULL;
-    ret = GenRsaKey(1024, &rsa_key, public_key, private_key);
+    ret = GenRsaKey(2048, &rsa_key, public_key, private_key);
 
-    U1 * cipher = malloc(RSA_size(rsa_key));
-    if(cipher == NULL) assert (cipher != NULL);
+	/* For check key */
+    U1 keyDgst[4096] = {0x00, };
+    U4 keyDgst_len = 0;
 
-    printf("******* RSA-PSS Signification ************\n");
+    printf("******* RSA-PSS Sign / Verify ************\n");
+	printf("RSA key size : %d bit\n", RSA_size(rsa_key) * 8);
+
+    Sha256(public_key, strlen(public_key), keyDgst);
+	printf("public key hash value :\n");
+    DebugPrintArr(keyDgst, 32);
+	printf("\n");
+
+	printf("message(length : %d) : %s\n", msg_len, msg);
+	/* Sign */
     ret = sign_RSA_PSS(rsa_key, msg, msg_len, sign, &sign_len);
+	printf("sign(length : %d) : ", sign_len);
+	DebugPrintArr(sign, sign_len);
+	/* Verify */
     ret = verify_RSA_PSS(rsa_key, msg, msg_len, sign, sign_len);
+	
+	if(ret > 0) printf("\033[0;33mVerified\n\n\033[0m");
+	else printf("\033[0;31mVerify Failure\n\n\033[0m");
+
+    printf("******* Changed message *********\n");
+	char * tmp_msg = "hello, world";
+	printf("message : %s\n", tmp_msg);
+
+	/* Re-Verify */
+    ret = verify_RSA_PSS(rsa_key, tmp_msg, msg_len, sign, sign_len);
+	if(ret > 0) printf("\033[0;33mVerified\n\n\033[0m");
+	else printf("\033[0;31mVerify Failure\n\n\033[0m");
+	
+    printf("******* Changed sign ************\n");
+	char * tmp_sign = (char *)malloc(sign_len);
+	memcpy(tmp_sign, sign, sign_len);
+	
+	tmp_sign[sign_len - 1] = 0xff; // last 1byte 0 -> 0xff
+	DebugPrintArr(tmp_sign, sign_len);
+
+	/* Re-Verify */
+    ret = verify_RSA_PSS(rsa_key, msg, msg_len, tmp_sign, sign_len);
+
+	if(ret > 0) printf("\033[0;33mVerified\n\n\033[0m");
+	else printf("\033[0;31mVerify Failure\n\n\033[0m");
+
+	printf("********* Different Key ***********\n");
+	memset(public_key, 0, 4096);
+	memset(keyDgst, 0, 4096);
+    ret = GenRsaKey(2048, &rsa_key, public_key, private_key);
+    Sha256(public_key, strlen(public_key), keyDgst);
+	printf("public key hash value :\n");
+    DebugPrintArr(keyDgst, 32);
+
+	/* Re-Verify */
+    ret = verify_RSA_PSS(rsa_key, msg, msg_len, sign, sign_len);
+	
+	if(ret > 0) printf("\033[0;33mVerified\n\n\033[0m");
+	else printf("\033[0;31mVerify Failure\n\n\033[0m");
+
+	free(tmp_sign);
+	RSA_free(rsa_key);
 }
 
 void testRSA_enc_dec(void)

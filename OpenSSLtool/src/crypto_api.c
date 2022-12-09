@@ -139,11 +139,10 @@ U2 verify_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len, IN U1 *sign, IN U4
 
 	ret = EVP_PKEY_verify(ctx, sign, (size_t)sign_len, md, md_len);
 
-	if (ret == 1) printf("Verified\n");
-	else printf("NO Verified\n");
-
 	EVP_PKEY_free(pkey);
 	EVP_PKEY_CTX_free(ctx);
+
+	return ret;
 }
 
 U2 sign_RSA_PSS(IN RSA *rsa_key, IN U1 *msg, IN U4 msg_len, OUT U1 *sign, OUT U4 *sign_len)

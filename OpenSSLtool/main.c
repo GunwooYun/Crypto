@@ -173,7 +173,9 @@ int main(int argc, char **argv)
 	//testSha256();
 	//testHmac();
 
-	 testRSA_enc_dec();
+	// testRSA_enc_dec();
+
+	testRSA_sign_verify();
 
 
 
