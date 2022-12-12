@@ -7,3 +7,4 @@
 * GNU Make 4.3
 ## Development History
 * 22.12.12 (mon) Fixed saved wrong hashed password
+* 22.12.12 (mon) Make range of ID (5byte ~ 20byte)
