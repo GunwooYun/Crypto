@@ -112,7 +112,7 @@ void testRSA_sign_verify(void)
 	RSA_free(rsa_key);
 }
 
-void testRSA_enc_dec(void)
+void testRSA_enc_dec_OAEP(void)
 {
 	U2 ret = 0;
 
