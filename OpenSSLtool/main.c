@@ -45,6 +45,8 @@ void init_data()
 	U1 hashed_pw[32] = {0, };
 	U4 writtenBytes = 0;
 
+	U1 id_buf_len = 0;
+
 
 	fp_data = fopen("./.data", "rb");
 	if(fp_data != NULL)
@@ -55,8 +57,19 @@ void init_data()
 
 	printf("Initialize Data\n");
 	printf("Create ID & Password\n");
-	printf("ID (5 ~ 32byte) : ");
-	fgets(id_buf, sizeof(id_buf), stdin);
+	do{
+		printf("ID (len : 5 ~ 20) : ");
+		fgets(id_buf, sizeof(id_buf), stdin);
+
+		/* fflush buffer of stdin*/
+		if(strlen(id_buf) >= 31 && id_buf[30] != '\n')
+		{
+			while(getchar() != '\n');
+		}
+		id_buf_len = strlen(id_buf) - 1; // strlen read '\n'
+		if(id_buf_len >= 5 && id_buf_len <= 20) break; // 5 <= length of ID <= 20
+		printf("id length incorrect\n");
+	}while(1);
 
 	printf("PW : ");
 	fgets(pw_buf, sizeof(pw_buf), stdin);
