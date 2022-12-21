@@ -1,6 +1,6 @@
 /*******************
 Author : Gunwoo Yun
-Date : 22.12.17
+Date : 22.12.21
 Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify ECDSA_sign_verify
 
 *******************/
@@ -10,6 +10,9 @@ Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify ECDSA_sign_verify
 #include <string.h>
 #include <assert.h>
 #include <stdbool.h>
+//#include <conio.h>
+#include <curses.h>
+#include <termios.h>
 #include "./inc/defines.h"
 #include "./inc/crypto_api.h"
 #include "./inc/interface.h"
@@ -18,7 +21,66 @@ Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify ECDSA_sign_verify
 U1 flag_need_init = 0;
 U1 flag_logged_in = 0;
 
+enum log_in_step
+{
+	CHECK_ID = 0,
+	CHECK_PW,
+	CHECK_RE_PW,
+};
+
 extern U1 KEK[32];
+
+#if 0
+char _getKey() {
+    char buf = 0;
+    struct termios old = { 0 };
+    fflush(stdout);
+    if (tcgetattr(0, &old) < 0) perror("tcsetattr()");
+    old.c_lflag    &= ~ICANON;   // local modes = Non Canonical mode
+    old.c_lflag    &= ~ECHO;     // local modes = Disable echo.
+    old.c_cc[VMIN]  = 1;         // control chars (MIN value) = 1
+    old.c_cc[VTIME] = 0;         // control chars (TIME value) = 0 (No time)
+    if (tcsetattr(0, TCSANOW, &old) < 0) perror("tcsetattr ICANON");
+    if (read(0, &buf, 1) < 0) perror("read()");
+    old.c_lflag    |= ICANON;    // local modes = Canonical mode
+    old.c_lflag    |= ECHO;      // local modes = Enable echo.
+    if (tcsetattr(0, TCSADRAIN, &old) < 0) perror ("tcsetattr ~ICANON");
+    return buf;
+ }
+#endif
+
+char getKey()
+{
+    char ch;
+    struct termios old;
+    struct termios current;
+
+    /* 현재 설정된 terminal i/o 값을 backup함 */
+    tcgetattr(0, &old);
+
+    /* 현재의 설정된 terminal i/o에 일부 속성만 변경하기 위해 복사함 */
+    current = old;
+
+    /* buffer i/o를 중단함 */
+    current.c_lflag &= ~ICANON;
+
+#if 0
+	if (is_echo) {  // 입력값을 화면에 표시할 경우
+		current.c_lflag |= ECHO;
+	} else {        // 입력값을 화면에 표시하지 않을 경우
+		current.c_lflag &= ~ECHO;
+	}
+#endif
+
+	current.c_lflag &= ~ECHO;
+
+    /* 변경된 설정값으로 설정합니다.*/
+    tcsetattr(0, TCSANOW, &current);
+    ch = getchar();
+    tcsetattr(0, TCSANOW, &old);
+
+    return ch;
+}
 
 int arrcmp(IN U1 *arr_a, IN U1 *arr_b, IN U4 len)
 {
@@ -78,11 +140,11 @@ void init_data()
 	U1 hashed_pw[32] = {0, };
 	U4 writtenBytes = 0;
 
-	U4 id_buf_len = 0;
-	U4 pw_buf_len = 0;
-	char ch;
-	int ch_idx = 0;
+	char key;
+	int buf_idx = 0;
 
+	int loginStep = CHECK_ID;
+	bool isLoggedIn = false;
 
 	fp_data = fopen("./.data", "rb");
 	if(fp_data != NULL)
@@ -93,79 +155,96 @@ void init_data()
 
 	printf("Initialize Data\n");
 	printf("Create ID & Password\n");
-	do{
-		printf("ID (len : 5 ~ 20) : ");
-		fgets(id_buf, sizeof(id_buf), stdin);
-		//printf("id length : %d\n", chkStrLen(id_buf, 32));
 
-		/* fflush buffer of stdin*/
-		/*
-		if(strlen(id_buf) >= 31 && id_buf[30] != '\n')
-		{
-			while(getchar() != '\n');
-		}
-		*/
-		//id_buf_len = strlen(id_buf) - 1; // strlen read '\n'
-		id_buf_len = getStrLen(id_buf, 32);
-		//printf("id_buf_len : %d\n", id_buf_len);
-		if(id_buf_len >= 5 && id_buf_len <= 20) break; // 5 <= length of ID <= 20
-		printf("id length incorrect\n");
-	}while(1);
-
-	do{
-		printf("PW (len : 5 ~ 30) : ");
-		fgets(pw_buf, sizeof(pw_buf), stdin);
-		/* fflush buffer of stdin*/
-			/*
-		if(strlen(pw_buf) >= 31 && pw_buf[30] != '\n')
-		{
-			while(getchar() != '\n');
-		}
-		*/
-		//pw_buf_len = strlen(pw_buf) - 1; // pw_buf + '\n'
-		pw_buf_len = getStrLen(pw_buf, 32);
-		//printf("pw_buf_len : %d\n", pw_buf_len);
-		if(pw_buf_len >= 5 && pw_buf_len <= 30) break; // 5 <= length of PW <= 30
-		printf("password length incorrect\n");
-
-	}while(1);
-	printf("pw buf : ");
-	for(int i = 0; i < 32; i++)
+	while(!isLoggedIn)
 	{
-		printf("%x ", pw_buf[i]);
-	}
-	printf("\n");
-
-	do{
-		memset(re_pw_buf, 0, 32);
-		printf("Re type PW  (len : 5 ~ 30) : ");
-		fgets(re_pw_buf, sizeof(re_pw_buf), stdin);
-		/* fflush buffer of stdin*/
-			/*
-		if(strlen(pw_buf) >= 31 && pw_buf[30] != '\n')
+		buf_idx = 0;
+		switch(loginStep)
 		{
-			while(getchar() != '\n');
-		}
-		*/
-		//pw_buf_len = strlen(pw_buf) - 1; // pw_buf + '\n'
-		pw_buf_len = getStrLen(re_pw_buf, 32);
-		printf("re pw_buf_len : %d\n", pw_buf_len);
-		if(pw_buf_len >= 5 && pw_buf_len <= 30)
-		{
-			if(!strcmp(pw_buf, re_pw_buf))
-			{
+			case CHECK_ID:
+				memset(id_buf, 0, sizeof(id_buf));
+				printf("ID (len : 5 ~ 20) : ");
+				while((key = getchar()) != '\n')
+				{
+					if(buf_idx < 32)
+					{
+						id_buf[buf_idx++] = key;
+					}
+				}
+#ifdef DEBUG_MODE
+				printf("Number of typed keys : %d\n", buf_idx);
+				printf("typed id : ");
+				for(int i = 0; i < 32; i++)
+				{
+					printf("%x ", id_buf[i]);
+				}
+				printf("\n");
+#endif
+				if(buf_idx >= 5 && buf_idx <= 20) loginStep = CHECK_PW;
+				else printf("id length incorrect\n");
 				break;
-			}
-			else
-			{
-				printf("re password not same\n");
-			}
+			case CHECK_PW:
+				memset(pw_buf, 0, sizeof(pw_buf));
+				printf("PW (len : 5 ~ 30) : ");
+				while((key = getKey()) != '\n')
+				{
+					if(buf_idx < 32)
+					{
+						pw_buf[buf_idx++] = key;
+					}
+				}
+				printf("\n");
+#ifdef DEBUG_MODE
+				printf("Number of typed keys : %d\n", buf_idx);
+				printf("typed password : ");
+				for(int i = 0; i < 32; i++)
+				{
+					printf("%x ", pw_buf[i]);
+				}
+				printf("\n");
+#endif
+				if(buf_idx >= 5 && buf_idx <= 30) loginStep = CHECK_RE_PW;
+				else printf("password length incorrect\n");
+				break;
+			case CHECK_RE_PW:
+				memset(re_pw_buf, 0, 32);
+				printf("Re type PW  (len : 5 ~ 30) : ");
+				while((key = getKey()) != '\n')
+				{
+					if(buf_idx < 32)
+					{
+						re_pw_buf[buf_idx++] = key;
+					}
+				}
+				printf("\n");
+#ifdef DEBUG_MODE
+				printf("Number of typed keys : %d\n", buf_idx);
+				printf("re-typed password : ");
+				for(int i = 0; i < 32; i++)
+				{
+					printf("%x ", re_pw_buf[i]);
+				}
+				printf("\n");
+#endif
+				if(buf_idx >= 5 && buf_idx <= 30)
+				{
+					if(!strcmp(pw_buf, re_pw_buf))
+					{
+						isLoggedIn = true;
+						break;
+					}
+					else
+					{
+						printf("re password not same\n");
+					}
+				}
+				else
+				{
+					printf("password length incorrect\n");
+				}
+				break;
 		}
-		else
-		{
-			printf("password length incorrect\n");
-		}
-	}while(1);
+	}
 
 	/* Generate salt (len : 32byte) */
 	GenCtrDRBG(salt_len, salt);
