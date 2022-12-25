@@ -207,7 +207,7 @@ void testHmac(void)
 
     //DebugPrintArr(hmacData, (U4)strlen(hmacData));
 	printf("message : %s\n", hmacData);
-    ret = HmacSha256(0x01, hmacData, (U4)strlen(hmacData), msgDgst, &msgDgst_len);
+    //ret = HmacSha256(0x01, hmacData, (U4)strlen(hmacData), msgDgst, &msgDgst_len);
     DebugPrintArr(msgDgst, msgDgst_len);
 
     //free(key);

@@ -40,7 +40,7 @@ extern U2 GetKeyAriaAes(IN U1 key_idx, OUT U1 *key, OUT U4 *key_len);
 extern U2 GenCtrDRBG(IN U4 req_rand_len, OUT U1 *out_rand);
 
 extern U2 Sha256(IN U1 *msg, IN U4 msg_len, OUT U1 *md);
-U2 HmacSha256(IN U1 key_idx, IN U1 *msg, IN U4 msg_len, OUT U1 *md, OUT U4 *md_len);
+extern U2 HmacSha256(IN U1 key_idx, IN U1 *msg, IN U4 msg_len, OUT U1 *md, OUT U4 *md_len);
 extern U2 GmacGetTag(IN U1 *key, IN U1 *iv, IN U4 iv_len, IN U1 *aad, IN U4 aad_len, IN U4 req_tag_len, OUT U1 *tag, OUT U4 *tag_len);
 
 extern U2 EncryptARIA(IN U1 key_idx, IN U1 padding_flag, IN U1 block_mode, IN U1 *plain_text, IN U4 plain_len, OUT U1 *cipher, OUT U4 *cipher_len, IN U1 req_tag_len, OUT U1 *tag, OUT U4 *tag_len, IN U2 iv_len, IN const U1 *iv, IN U2 aad_len, IN const U1 *aad);

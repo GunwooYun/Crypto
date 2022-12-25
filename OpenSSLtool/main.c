@@ -1,6 +1,6 @@
 /*******************
 Author : Gunwoo Yun
-Date : 22.12.21
+Date : 22.12.23
 Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify ECDSA_sign_verify
 
 *******************/
@@ -20,6 +20,8 @@ Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify ECDSA_sign_verify
 
 U1 flag_need_init = 0;
 U1 flag_logged_in = 0;
+
+U1 systemKey[16] = {0x64,0x62,0x73,0x72,0x6A,0x73,0x64,0x6E,0x61,0x6A,0x74,0x77,0x6F,0x64,0x64,0x6C};
 
 enum log_in_step
 {
@@ -82,6 +84,30 @@ char getKey()
     return ch;
 }
 
+U2 Hmac(IN U1 *key, IN U1 *msg, IN U4 msg_len, OUT U1 *md, OUT U4 *md_len)
+{
+    int ret = 0;
+
+    HMAC_CTX *ctx = HMAC_CTX_new();
+    if(!ctx){
+        printf("HMAC_CTX_new() is NULL\n");
+        return 1;
+    }
+
+    if(!HMAC_Init_ex(ctx, key, 16, EVP_sha256(), NULL))
+        HandleErrors();
+
+    if(!HMAC_Update(ctx, msg, (size_t)msg_len))
+        HandleErrors();
+
+    if(!HMAC_Final(ctx, md, md_len))
+        HandleErrors();
+
+    HMAC_CTX_free(ctx);
+
+    return 0;
+}
+
 int arrcmp(IN U1 *arr_a, IN U1 *arr_b, IN U4 len)
 {
 	U1 *p_a = arr_a;
@@ -127,6 +153,84 @@ int getStrLen(U1 *str, U4 strSize)
 	return cnt;
 }
 
+int verifyData()
+{
+	FILE *fp_data = NULL;
+	FILE *fp_system = NULL;
+
+	U4 fileSize = 0;
+	U4 readFileBytes = 0;
+	U4 writtenFileBytes = 0;
+
+	U1 checkedDigest[32] = {0x00, };
+	U4 checkedDigestLen = 0;
+
+	U1 savedDigest[32] = {0x00, };
+
+	U2 ret = 0;
+
+	fp_data = fopen("./.data", "rb");
+	if(fp_data == NULL)
+		return 1;
+
+	fseek(fp_data, 0, SEEK_END);
+	fileSize = ftell(fp_data);
+	printf("file size : %d\n", fileSize);
+
+	U1 *fileBuffer = (U1 *)malloc(fileSize);
+
+	fseek(fp_data, 0, SEEK_SET);
+
+	readFileBytes = fread(fileBuffer, fileSize, 1, fp_data);
+
+//#ifdef DEBUG_MODE
+	//printf("readFileBytes : %d\n", readFileBytes);
+	for(int i = 0; i < fileSize; i++)
+	{
+		printf("%#x ", fileBuffer[i]);
+	}
+	printf("\n");
+
+	Hmac(systemKey, fileBuffer, readFileBytes, checkedDigest, &checkedDigestLen);
+	for(int i = 0; i < checkedDigestLen; i++)
+	{
+		printf("%#x ", checkedDigest[i]);
+	}
+
+	fp_system = fopen("./.system", "rb");
+	if(fp_system == NULL)
+	{
+		fp_system = fopen("./.system", "wb");
+		if(fp_system == NULL)
+		{
+			printf("file open failure\n");
+			return 1;
+		}
+
+		writtenFileBytes = fwrite(checkedDigest, 32, 1, fp_system);
+		assert(writtenFileBytes == 1);
+		printf("Generated data HMAC\nNeed to Excute again\n");
+		fclose(fp_system);
+		return -1;
+
+	}
+	else
+	{
+		fseek(fp_system, 0, SEEK_SET);
+		readFileBytes = fread(savedDigest, 32, 1, fp_system);
+		assert(readFileBytes == 1);
+	}
+	ret = arrcmp(checkedDigest, savedDigest, 32);
+	if(ret > 0)
+	{
+		printf("system file verification failed\n");
+		return 1;
+	}
+
+	return 0;
+
+}
+
 void init_data()
 {
 	FILE *fp_data = NULL;
@@ -146,11 +250,29 @@ void init_data()
 	int loginStep = CHECK_ID;
 	bool isLoggedIn = false;
 
+	int ret = 0;
+
+	/* First Execution */
 	fp_data = fopen("./.data", "rb");
 	if(fp_data != NULL)
 	{
-		printf("Already Initialized\n");
-		return;
+		fclose(fp_data);
+		ret = verifyData();
+		if (ret == 0)
+		{
+			printf("Data file verified\n");
+			return;
+		}
+		else if (ret < 0)
+		{
+			printf("ret < 0\n");
+			exit(0);
+		}
+		else
+		{
+			printf("verify error\n");
+			exit(0);
+		}
 	}
 
 	printf("Initialize Data\n");
@@ -266,6 +388,7 @@ void init_data()
 		printf("file open failure\n");
 		return;
 	}
+	
 	/* Write hashed id 32bytes */
 	writtenBytes = fwrite(hashed_id, sizeof(U1) /* 1byte */, sizeof(hashed_id), fp_data);
 	assert(writtenBytes == 32);
@@ -280,6 +403,8 @@ void init_data()
 	assert(writtenBytes == 32);
 
 	fclose(fp_data);
+
+	verifyData();
 }
 
 void log_in()
