@@ -6,6 +6,7 @@
 * GCC 11.3.0
 * GNU Make 4.3
 ## Development History
-* 22.12.12 (mon) Fixed saved wrong hashed password
-* 22.12.12 (mon) Make range of ID (5byte ~ 20byte)
-* 22.12.21 (wed) Hide typed keys for password, Changed structure of init_data()
+* 22.12.12 (Mon) Fixed saved wrong hashed password
+* 22.12.12 (Mon) Make range of ID (5byte ~ 20byte)
+* 22.12.21 (Wed) Hide typed keys for password, Changed structure of init_data()
+* 22.12.25 (Sun) Add function of verify data file using HMAC
