@@ -1,6 +1,6 @@
 /*******************
 Author : Gunwoo Yun
-Date : 22.12.23
+Date : 22.12.26
 Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify ECDSA_sign_verify
 
 *******************/
@@ -20,6 +20,7 @@ Crypto : ARIA HMAC-SHA256 SHA-256 GMAC RSA RSA_sign_verify ECDSA_sign_verify
 
 U1 flag_need_init = 0;
 U1 flag_logged_in = 0;
+bool flag_system_verified = false;
 
 U1 systemKey[16] = {0x64,0x62,0x73,0x72,0x6A,0x73,0x64,0x6E,0x61,0x6A,0x74,0x77,0x6F,0x64,0x64,0x6C};
 
@@ -169,13 +170,13 @@ int verifyData()
 
 	U2 ret = 0;
 
+	/* Read data from .data and Get Hmac */
 	fp_data = fopen("./.data", "rb");
 	if(fp_data == NULL)
 		return 1;
 
 	fseek(fp_data, 0, SEEK_END);
 	fileSize = ftell(fp_data);
-	printf("file size : %d\n", fileSize);
 
 	U1 *fileBuffer = (U1 *)malloc(fileSize);
 
@@ -183,23 +184,12 @@ int verifyData()
 
 	readFileBytes = fread(fileBuffer, fileSize, 1, fp_data);
 
-//#ifdef DEBUG_MODE
-	//printf("readFileBytes : %d\n", readFileBytes);
-	for(int i = 0; i < fileSize; i++)
-	{
-		printf("%#x ", fileBuffer[i]);
-	}
-	printf("\n");
-
 	Hmac(systemKey, fileBuffer, readFileBytes, checkedDigest, &checkedDigestLen);
-	for(int i = 0; i < checkedDigestLen; i++)
-	{
-		printf("%#x ", checkedDigest[i]);
-	}
 
 	fp_system = fopen("./.system", "rb");
 	if(fp_system == NULL)
 	{
+		// Doesn't exist .system file, so create
 		fp_system = fopen("./.system", "wb");
 		if(fp_system == NULL)
 		{
@@ -207,15 +197,16 @@ int verifyData()
 			return 1;
 		}
 
+		// Create .system file
 		writtenFileBytes = fwrite(checkedDigest, 32, 1, fp_system);
+#ifdef DEBUG_MODE
 		assert(writtenFileBytes == 1);
-		printf("Generated data HMAC\nNeed to Excute again\n");
-		fclose(fp_system);
-		return -1;
-
+#endif
+		goto end;
 	}
 	else
 	{
+		// .system file already exists
 		fseek(fp_system, 0, SEEK_SET);
 		readFileBytes = fread(savedDigest, 32, 1, fp_system);
 		assert(readFileBytes == 1);
@@ -226,6 +217,13 @@ int verifyData()
 		printf("system file verification failed\n");
 		return 1;
 	}
+
+	flag_system_verified = true;
+
+end:
+	free(fileBuffer);
+	fclose(fp_data);
+	fclose(fp_system);
 
 	return 0;
 
@@ -258,21 +256,7 @@ void init_data()
 	{
 		fclose(fp_data);
 		ret = verifyData();
-		if (ret == 0)
-		{
-			printf("Data file verified\n");
-			return;
-		}
-		else if (ret < 0)
-		{
-			printf("ret < 0\n");
-			exit(0);
-		}
-		else
-		{
-			printf("verify error\n");
-			exit(0);
-		}
+		goto finishVerify;
 	}
 
 	printf("Initialize Data\n");
@@ -307,6 +291,7 @@ void init_data()
 				break;
 			case CHECK_PW:
 				memset(pw_buf, 0, sizeof(pw_buf));
+				buf_idx = 0;
 				printf("PW (len : 5 ~ 30) : ");
 				while((key = getKey()) != '\n')
 				{
@@ -330,6 +315,7 @@ void init_data()
 				break;
 			case CHECK_RE_PW:
 				memset(re_pw_buf, 0, 32);
+				buf_idx = 0;
 				printf("Re type PW  (len : 5 ~ 30) : ");
 				while((key = getKey()) != '\n')
 				{
@@ -404,7 +390,22 @@ void init_data()
 
 	fclose(fp_data);
 
-	verifyData();
+	ret = verifyData();
+finishVerify:
+		if (ret == 0)
+		{
+			if(flag_system_verified)
+				printf("Data file verified\n");
+			else
+				printf("HMAC Generated\n");
+			return;
+		}
+		else
+		{
+			printf("verify error\n");
+			exit(0);
+		}
+
 }
 
 void log_in()
@@ -426,6 +427,9 @@ void log_in()
 
 	FILE *fp_data = NULL;
 
+	char key = 0;
+	int buf_idx = 0;
+
 	fp_data = fopen("./.data", "rb");
 	if(fp_data == NULL)
 	{
@@ -438,12 +442,13 @@ void log_in()
 	assert(readBytes == 32);
 	readBytes = fread(saved_hashed_pw, sizeof(U1), 32, fp_data); // fetch pw
 	assert(readBytes == 32);
-	printf("saved hashed password : ");
+#ifdef DEBUG_MODE
 	for(int i = 0; i < 32; i++)
 	{
 		printf("%x ", saved_hashed_pw[i]);
 	}
 	printf("\n");
+#endif
 	readBytes = fread(salt, sizeof(U1), 32, fp_data); // fetch salt
 	assert(readBytes == 32);
 
@@ -476,21 +481,39 @@ void log_in()
 
 			case 1 :
 				memset(pw_buf, 0, sizeof(pw_buf));
+				buf_idx = 0;
 				printf("PW (len : 5 ~ 30) : ");
-				fgets(pw_buf, sizeof(pw_buf), stdin);
+				while((key = getKey()) != '\n')
+				{
+					if(buf_idx < 32)
+					{
+						pw_buf[buf_idx++] = key;
+					}
+				}
+				if( buf_idx >= 5 && buf_idx <= 30) {}
+				else
+				{
+					printf("Password Length Incorrect\n");
+					continue;
+				}
+				//fgets(pw_buf, sizeof(pw_buf), stdin);
 
-				bufLen = getStrLen(pw_buf, 32);
+				//bufLen = getStrLen(pw_buf, 32);
+				/*
 				if(bufLen < 5 || bufLen > 20)
 				{
 					printf("pw length incorrect\n");
 					break;
 				}
+				*/
+#ifdef DEBUG_MODE
 				printf("login pw buf : ");
 				for(int i = 0; i < 32; i++)
 				{
 					printf("%x ", pw_buf[i]);
 				}
 				printf("\n");
+#endif
 				memset(salted_pw, 0, sizeof(salted_pw));
 				memset(input_hashed_pw, 0, sizeof(input_hashed_pw));
 
@@ -502,12 +525,14 @@ void log_in()
 				/* Get hashed input password */
 				Sha256(salted_pw, sizeof(salted_pw), input_hashed_pw);
 
+#ifdef DEBUG_MODE
 				printf("input hashed password : ");
 				for(int i = 0; i < 32; i++)
 				{
 					printf("%x ", input_hashed_pw[i]);
 				}
 				printf("\n");
+#endif
 
 				if(!arrcmp(input_hashed_pw, saved_hashed_pw, 32))
 				{
@@ -532,7 +557,7 @@ void log_in()
 	Sha256(input_hashed_pw, sizeof(input_hashed_pw), KEK);
 
 	fclose(fp_data);
-	printf("Log-in Success\n");
+	printf("\n\nLog-in Success\n");
 }
 
 

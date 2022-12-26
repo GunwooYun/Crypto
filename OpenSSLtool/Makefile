@@ -13,4 +13,4 @@ crypto_api.o : ./src/crypto_api.c
 err.o : ./src/err.c
 	$(CC) -g -c -o err.o ./src/err.c -I/usr/local/ssl/include -L/usr/local/ssl/lib -lcrypto -lssl
 clean:
-	rm -rf main main.o example.o hmac.o aria.o err.o crypto_api.o
+	rm -rf main main.o example.o hmac.o aria.o err.o crypto_api.o .data .system
