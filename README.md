@@ -10,3 +10,4 @@
 * 22.12.12 (Mon) Make range of ID (5byte ~ 20byte)
 * 22.12.21 (Wed) Hide typed keys for password, Changed structure of init_data()
 * 22.12.25 (Sun) Add function of verify data file using HMAC
+* 22.12.26 (Mon) Make typed password hidden for login and fix some errors
