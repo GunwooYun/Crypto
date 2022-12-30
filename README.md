@@ -11,4 +11,4 @@
 * 22.12.21 (Wed) Hide typed keys for password, Changed structure of init_data()
 * 22.12.25 (Sun) Add function of verify data file using HMAC
 * 22.12.26 (Mon) Make typed password hidden for login and fix some errors
-* 22.12.30 (Fir) Seperate init & login function
+* 22.12.30 (Fir) Separate initialzie data & login & verify function in file (system.h, system.c)
