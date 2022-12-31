@@ -419,7 +419,7 @@ U2 GetKeyAriaAes(IN U1 key_idx, OUT U1 *key, OUT U4 *key_len)
 	return 0x9000;
 }
 
-int GenKeyAriaAes(IN U1 key_idx, IN U4 req_key_len)
+int genSymmKey(IN U1 key_idx, IN U4 req_key_len)
 {
 	U2 ret = 0;
 	U1 tmp_buf[32] = {0, };
@@ -435,7 +435,7 @@ int GenKeyAriaAes(IN U1 key_idx, IN U4 req_key_len)
 	if (key_idx < 0 && key_idx > 4)
 	{
 		PrintErrMsg(0xfe03);
-		return 0;
+		return 1;
 	}
 
 	/* ARIA, AES key length : 16, 24, 32 byte */
@@ -447,7 +447,7 @@ int GenKeyAriaAes(IN U1 key_idx, IN U4 req_key_len)
 	else
 	{
 		PrintErrMsg(0xfe04);
-		return 0;
+		return 1;
 	}
 
 	/* Generate key using CTR-DRBG */
@@ -459,7 +459,7 @@ int GenKeyAriaAes(IN U1 key_idx, IN U4 req_key_len)
 	if(fp_data == NULL)
 	{
 		PrintErrMsg(0xd284);
-		return 0;
+		return 1;
 	}
 
 	U4 *pEnc_key_len;
@@ -482,12 +482,12 @@ int GenKeyAriaAes(IN U1 key_idx, IN U4 req_key_len)
 	{
 		PrintErrMsg(0x003f);
 		fclose(fp_data);
-		return 0;
+		return 1;
 	}
 
 	fclose(fp_data);
 	
-	return 1;
+	return 0;
 }
 
 U2 Sha256(IN U1 *msg, IN U4 msg_len, OUT U1 *md)

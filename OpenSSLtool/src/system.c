@@ -531,3 +531,46 @@ void log_in()
 	printf("\n\nLog-in Success\n");
 
 }
+
+int showMenu(void)
+{
+	int menu, ret = 0;
+	int symKeyIdx, symKeyLen;
+	printf("1. Generate Symmetric Key\n");
+	printf("2. Generate RSA Key\n");
+	printf("0. Exit\n");
+	printf("\n");
+	printf("Choose Menu (1~5) >> ");
+
+	scanf("%d", &menu);
+
+	switch(menu)
+	{
+		case EXIT:
+			return 0;
+		case GEN_SYM_KEY:
+			printf("Choose Index (0~4) >> ");
+			scanf("%d", &symKeyIdx);
+			printf("Length (16, 24, 32) >> ");
+			scanf("%d", &symKeyLen);
+			ret = genSymmKey(symKeyIdx, symKeyLen);
+			if(ret == 0)
+				printf("Generated Symmetric Key Successfully!\n");
+			break;
+		case GEN_RSA_KEY:
+			break;
+		case ENC_DEC_ARIA:
+			break;
+		default :
+			break;
+	}
+	
+}
+
+void start(void)
+{
+	while(1)
+	{
+		showMenu();
+	}
+}

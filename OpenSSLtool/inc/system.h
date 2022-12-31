@@ -24,12 +24,22 @@ enum log_in_step
     CHECK_RE_PW,
 };
 
-extern char getKey(void);
-extern U2 Hmac(IN U1 *key, IN U1 *msg, IN U4 msg_len, OUT U1 *md, OUT U4 *md_len);
-extern int arrcmp(IN U1 *arr_a, IN U1 *arr_b, IN U4 len);
+enum eMenuNumber
+{
+	EXIT = 0,
+	GEN_SYM_KEY,
+	GEN_RSA_KEY,
+	ENC_DEC_ARIA
+};
+
+char getKey(void);
+U2 Hmac(IN U1 *key, IN U1 *msg, IN U4 msg_len, OUT U1 *md, OUT U4 *md_len);
+int arrcmp(IN U1 *arr_a, IN U1 *arr_b, IN U4 len);
 int verifyData(void);
 void init_data(void);
 void log_in(void);
 int getStrLen(U1 *str, U4 strSize);
+
+void start(void);
 
 #endif

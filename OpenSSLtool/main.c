@@ -26,5 +26,7 @@ int main(int argc, char **argv)
 	init_data();
 	log_in();
 
+	start();
+
 	return 0;
 }
