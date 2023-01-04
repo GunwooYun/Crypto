@@ -532,12 +532,102 @@ void log_in()
 
 }
 
+void GetString(char *ask, char *str, int strLen, int *outStrLen)
+{
+    int index = 0;
+    char ch;
+
+    while(1)
+    {
+        if(ask != NULL)
+            printf("%s", ask);
+        while((ch = getchar()) != '\n')
+        {
+            if(index < strLen)
+            {
+                str[index] = ch;
+            }
+            index++;
+        }
+
+        if(index > strLen || index == 0)
+        {
+            printf("length error\n");
+            index = 0;
+        }
+        else
+        {
+            break;
+        }
+    }
+    *outStrLen = index;
+}
+
+void AskGetStringNull(char *ask, char *str, int strLen)
+{
+    int index = 0;
+    char ch;
+
+    while(1)
+    {
+        if(ask != NULL)
+            printf("%s", ask);
+        while((ch = getchar()) != '\n')
+        {
+            if(index < (strLen - 1))
+            {
+                str[index] = ch;
+            }
+            index++;
+        }
+
+        if(index > (strLen-1) || index == 0)
+        {
+            printf("length error\n");
+            index = 0;
+        }
+        else
+        {
+            break;
+        }
+    }
+    str[index] = '\0';
+}
+
+void MenuEncDecAria(void)
+{
+	int select_menu;
+	char ch, file_name[32] = {0, };
+	int file_name_len;
+	FILE *fp = NULL;
+
+	printf("1) encryption 2) Decryption >> ");
+	scanf("%d", &select_menu);
+	
+	switch(select_menu)
+	{
+		case 1:
+			AskGetStringNull("Enter file name >> ", file_name, 32);
+			fp = fopen(file_name, "r");
+			if(fp == NULL)
+				printf("Can't open file\n");
+			break;
+		case 2:
+			break;
+		default:
+			break;
+	}
+}
+
+
 int showMenu(void)
 {
 	int menu, ret = 0;
 	int symKeyIdx, symKeyLen;
+	printf("\n\n");
 	printf("1. Generate Symmetric Key\n");
 	printf("2. Generate RSA Key\n");
+	printf("3. ARIA\n");
 	printf("0. Exit\n");
 	printf("\n");
 	printf("Choose Menu (1~5) >> ");
@@ -560,6 +650,7 @@ int showMenu(void)
 		case GEN_RSA_KEY:
 			break;
 		case ENC_DEC_ARIA:
+			MenuEncDecAria();
 			break;
 		default :
 			break;
