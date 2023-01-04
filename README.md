@@ -12,3 +12,5 @@
 * 22.12.25 (Sun) Add function of verify data file using HMAC
 * 22.12.26 (Mon) Make typed password hidden for login and fix some errors
 * 22.12.30 (Fir) Separate initialzie data & login & verify function in file (system.h, system.c)
+* 22.12.31 (Sat) Create menu and generate symmetric key
+* 23.01.04 (Wed) Make function ARIA
